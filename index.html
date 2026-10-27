@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Gestión y Carga Masiva de Horarios ETS - SAES</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ipn: {
+              maroon: '#6C1D45',
+              darkmaroon: '#4F1332',
+              gold: '#B38E5D',
+              lightgold: '#FDF8F0',
+              accent: '#8B265B'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- SheetJS (xlsx.full.min.js) for parsing & exporting Excel files -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* Custom scrollbars for high-density tables */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .custom-sticky-header th {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased font-sans min-h-screen flex flex-col">
+
+  <!-- ================= TOP HEADER / NAVBAR ================= -->
+  <header class="bg-gradient-to-r from-ipn-darkmaroon via-ipn-maroon to-slate-900 text-white shadow-lg sticky top-0 z-40 border-b border-ipn-gold/30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <!-- Brand & Title -->
+        <div class="flex items-center space-x-3">
+          <div class="bg-white/10 p-2.5 rounded-xl border border-white/20 backdrop-blur-sm shadow-inner flex items-center justify-center">
+            <i class="fa-solid fa-graduation-cap text-ipn-gold text-2xl"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-lg md:text-xl font-bold tracking-tight">Carga Masiva de Horarios ETS</h1>
+              <span id="periodBadge" class="bg-ipn-gold/25 text-amber-200 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-ipn-gold/40">Periodo 2026-2</span>
+            </div>
+            <p class="text-xs text-slate-300">Validación y Formato Oficial para SAES • Jefaturas de Departamento Académico</p>
+          </div>
+        </div>
+
+        <!-- Global Action Buttons -->
+        <div class="flex items-center flex-wrap gap-2">
+          <!-- Upload Button -->
+          <label class="cursor-pointer bg-white/10 hover:bg-white/20 active:scale-95 transition text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 border border-white/20">
+            <i class="fa-solid fa-file-excel text-emerald-400 text-sm"></i>
+            <span>Importar Plantilla</span>
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls" class="hidden">
+          </label>
+
+          <!-- Export Excel -->
+          <button id="btnExportExcel" class="bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm">
+            <i class="fa-solid fa-download"></i>
+            <span>Exportar Excel SAES</span>
+          </button>
+
+          <!-- Manage Docentes Modal Trigger -->
+          <button id="btnOpenDocentes" class="bg-slate-700/80 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-users text-sky-400"></i>
+            <span>Catálogo Docentes (<span id="countDocentesBadge">0</span>)</span>
+          </button>
+
+          <!-- Reset / Demo data dropdown -->
+          <button id="btnResetDemo" title="Recargar Datos Demo Oficiales" class="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition">
+            <i class="fa-solid fa-rotate-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= SUB-BAR / METRICS & STATS ================= -->
+  <section class="bg-white border-b border-slate-200 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Progress Metric -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 flex items-center space-x-3.5">
+          <div class="w-10 h-10 rounded-lg bg-ipn-maroon/10 text-ipn-maroon flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-chart-pie"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-center text-xs mb-1">
+              <span class="text-slate-500 font-medium">Progreso Global</span>
+              <span id="metricProgressPercent" class="font-bold text-ipn-maroon">0%</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div id="metricProgressBar" class="bg-ipn-maroon h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div class="text-[11px] text-slate-400 mt-1">
+              <span id="metricCompleted">0</span> de <span id="metricTotal">0</span> programados
+            </div>
+          </div>
+        </div>
+
+        <!-- Conflicts Card -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 flex items-center space-x-3.5">
+          <div id="conflictIconContainer" class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
+            <i id="conflictIcon" class="fa-solid fa-shield-check"></i>
+          </div>
+          <div>
+            <div class="text-xs text-slate-500 font-medium">Empalmes de Docentes</div>
+            <div id="metricConflictsCount" class="text-xl font-bold text-emerald-600">0</div>
+            <div id="metricConflictsSub" class="text-[11px] text-emerald-600 font-medium">Sin traslapes de horario</div>
+          </div>
+        </div>
+
+        <!-- High Demand / Reprobados Focus -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 flex items-center space-x-3.5">
+          <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-fire text-amber-500"></i>
+          </div>
+          <div>
+            <div class="text-xs text-slate-500 font-medium">Demanda Histórica</div>
+            <div id="metricHighDemandCount" class="text-xl font-bold text-slate-800">0</div>
+            <div class="text-[11px] text-slate-400">Total acumulado 4 Periodos</div>
+          </div>
+        </div>
+
+        <!-- Active Jefatura Filter Indicator -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 flex items-center space-x-3.5">
+          <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-sitemap"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-xs text-slate-500 font-medium">Jefatura Seleccionada</div>
+            <div id="metricActiveJefatura" class="text-xs font-bold text-slate-800 truncate">Todas (Gestión Escolar)</div>
+            <div class="text-[11px] text-slate-400"><span id="metricJefaturaCount">0</span> unidades visibles</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MAIN WORKSPACE ================= -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-5">
+    
+    <!-- Controls Toolbar: Filters & Batch Actions -->
+    <div class="bg-white p-4 rounded-xl shadow-xs border border-slate-200 space-y-4">
+      
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        <!-- Jefatura Selector (Primary) -->
+        <div class="md:col-span-4">
+          <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
+            <i class="fa-solid fa-building-columns text-ipn-maroon"></i>
+            <span>Jefatura de Departamento</span>
+          </label>
+          <select id="filterJefatura" class="w-full text-xs font-medium bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-ipn-maroon focus:bg-white transition">
+            <option value="ALL">🏢 [TODAS] Vista Administrador - Gestión Escolar</option>
+            <!-- Injected via JavaScript -->
+          </select>
+        </div>
+
+        <!-- Turno Selector -->
+        <div class="md:col-span-2">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Turno</label>
+          <select id="filterTurno" class="w-full text-xs font-medium bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-ipn-maroon focus:bg-white transition">
+            <option value="ALL">Todos los turnos</option>
+            <option value="MATUTINO">Matutino</option>
+            <option value="VESPERTINO">Vespertino</option>
+          </select>
+        </div>
+
+        <!-- Semestre / Nivel Selector -->
+        <div class="md:col-span-2">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Semestre / Nivel</label>
+          <select id="filterSemestre" class="w-full text-xs font-medium bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-ipn-maroon focus:bg-white transition">
+            <option value="ALL">Todos los semestres</option>
+            <option value="1">1er Semestre</option>
+            <option value="2">2do Semestre</option>
+            <option value="3">3er Semestre</option>
+            <option value="4">4to Semestre</option>
+            <option value="5">5to Semestre</option>
+            <option value="6">6to Semestre</option>
+            <option value="7">7mo Semestre</option>
+            <option value="8">8vo Semestre</option>
+          </select>
+        </div>
+
+        <!-- Live Search Filter -->
+        <div class="md:col-span-4">
+          <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center justify-between">
+            <span>Búsqueda Rápida</span>
+            <span id="searchResultCount" class="text-[10px] text-slate-400"></span>
+          </label>
+          <div class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="searchInput" placeholder="Materia, clave, profesor o RFC..." class="w-full pl-8 pr-8 text-xs bg-slate-50 border border-slate-300 rounded-lg py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-ipn-maroon focus:bg-white transition">
+            <button id="btnClearSearch" class="hidden absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bulk Quick-Assign Bar -->
+      <div class="pt-3 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-2 text-slate-600">
+          <span class="font-bold text-ipn-maroon flex items-center gap-1.5">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            Asignación en Lote:
+          </span>
+          <span class="text-slate-400">Aplica a las <span id="filteredRowsCount" class="font-semibold text-slate-700">0</span> filas visibles</span>
+        </div>
+
+        <div class="flex items-center flex-wrap gap-2">
+          <!-- Batch Date -->
+          <div class="flex items-center space-x-1">
+            <span class="text-slate-500 font-medium text-[11px]">Fecha:</span>
+            <input type="date" id="batchDate" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-ipn-maroon">
+          </div>
+
+          <!-- Batch Time -->
+          <div class="flex items-center space-x-1">
+            <span class="text-slate-500 font-medium text-[11px]">Hora:</span>
+            <select id="batchTime" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-ipn-maroon">
+              <option value="">Seleccionar...</option>
+              <option value="08:00">08:00 hrs</option>
+              <option value="10:00">10:00 hrs</option>
+              <option value="12:00">12:00 hrs</option>
+              <option value="14:00">14:00 hrs</option>
+              <option value="16:00">16:00 hrs</option>
+              <option value="18:00">18:00 hrs</option>
+              <option value="20:00">20:00 hrs</option>
+            </select>
+          </div>
+
+          <!-- Apply Batch Button -->
+          <button id="btnApplyBatch" class="bg-ipn-maroon hover:bg-ipn-darkmaroon text-white px-3 py-1.5 rounded font-semibold active:scale-95 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Aplicar a Visibles</span>
+          </button>
+
+          <!-- Clear Visible Dates Button -->
+          <button id="btnClearBatch" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-2.5 py-1.5 rounded font-medium transition" title="Limpiar fecha/hora de lo visible">
+            <i class="fa-solid fa-eraser"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Conflict Warning Banner (Hidden by default, shown if collisions exist) -->
+    <div id="conflictAlertBanner" class="hidden bg-red-50 border-l-4 border-red-500 p-3.5 rounded-r-lg shadow-xs flex items-start gap-3">
+      <i class="fa-solid fa-triangle-exclamation text-red-500 text-lg mt-0.5"></i>
+      <div class="text-xs text-red-800 flex-1">
+        <strong class="font-bold">¡Atención! Se detectaron empalmes de docentes:</strong>
+        <span id="conflictAlertText" class="block mt-0.5 text-red-700"></span>
+      </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden flex flex-col">
+      <!-- Table Header Status Bar -->
+      <div class="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
+        <div>
+          Mostrando <span id="tableShowingCount" class="font-bold text-slate-700">0</span> materias
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Completa</span>
+          <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span> Incompleta</span>
+          <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> Empalme</span>
+        </div>
+      </div>
+
+      <!-- Responsive Table Scroll Area -->
+      <div class="overflow-x-auto max-h-[640px] relative">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[11px] custom-sticky-header shadow-xs">
+            <tr>
+              <th class="py-3 px-3 border-b border-slate-200 text-center w-12">#</th>
+              <th class="py-3 px-3 border-b border-slate-200 w-28">Carrera / Plan</th>
+              <th class="py-3 px-3 border-b border-slate-200 w-24">Sem. / Turno</th>
+              <th class="py-3 px-3 border-b border-slate-200 min-w-[200px]">Materia / Unidad</th>
+              <th class="py-3 px-3 border-b border-slate-200 text-center w-28" title="Histórico de reprobados en 4 periodos anteriores">
+                # Reprobados
+              </th>
+              <th class="py-3 px-3 border-b border-slate-200 min-w-[155px]">Fecha Examen</th>
+              <th class="py-3 px-3 border-b border-slate-200 min-w-[125px]">Hora (24h)</th>
+              <th class="py-3 px-3 border-b border-slate-200 min-w-[260px]">Profesor Asignado</th>
+              <th class="py-3 px-3 border-b border-slate-200 text-center w-20">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="etsTableBody" class="divide-y divide-slate-100">
+            <!-- Dynamically populated rows -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden py-16 flex flex-col items-center justify-center text-slate-400">
+        <i class="fa-regular fa-folder-open text-4xl mb-3 text-slate-300"></i>
+        <p class="text-sm font-semibold text-slate-600">No se encontraron materias con los filtros seleccionados</p>
+        <p class="text-xs text-slate-400 mt-1">Ajuste la jefatura, turno o término de búsqueda.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================= MODAL: GESTIÓN DE DOCENTES ================= -->
+  <div id="modalDocentes" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[85vh] overflow-hidden border border-slate-200">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-users-gear text-ipn-gold text-lg"></i>
+          <h3 class="text-base font-bold">Catálogo Oficial de Docentes</h3>
+        </div>
+        <button id="btnCloseModalDocentes" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Add New Docente Bar -->
+      <div class="p-4 bg-slate-50 border-b border-slate-200">
+        <p class="text-xs font-semibold text-slate-600 mb-2">Registrar o Modificar Docente:</p>
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+          <div class="sm:col-span-4">
+            <input type="text" id="newDocenteRfc" placeholder="RFC (ej. GOMR780512AB3)" class="w-full text-xs uppercase px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-ipn-maroon">
+          </div>
+          <div class="sm:col-span-6">
+            <input type="text" id="newDocenteNombre" placeholder="Nombre completo del profesor" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-ipn-maroon">
+          </div>
+          <div class="sm:col-span-2">
+            <button id="btnAddDocente" class="w-full bg-ipn-maroon hover:bg-ipn-darkmaroon text-white font-semibold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1">
+              <i class="fa-solid fa-plus"></i>
+              <span>Guardar</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search in Modal & List -->
+      <div class="p-4 flex-1 overflow-y-auto">
+        <div class="relative mb-3">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+          <input type="text" id="searchDocentesModal" placeholder="Buscar por RFC o Nombre..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+        </div>
+        <div class="border border-slate-200 rounded-lg overflow-hidden">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+              <tr>
+                <th class="px-3 py-2 w-36">RFC</th>
+                <th class="px-3 py-2">Nombre Completo</th>
+                <th class="px-3 py-2 text-center w-20">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="docentesModalList" class="divide-y divide-slate-100">
+              <!-- Dynamically rendered -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button id="btnDoneModalDocentes" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-4 py-2 rounded-lg">
+          Cerrar
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ================= LOGIC & DATA SCRIPT ================= -->
+  <script>
+    /* =========================================================================
+       1. DATA CATALOGS & CONSTANTS
+       ========================================================================= */
+    const STORAGE_KEY_ETS = 'IPN_SAES_ETS_DATA_V1';
+    const STORAGE_KEY_DOCENTES = 'IPN_SAES_DOCENTES_V1';
+    const PERIOD_DEFAULT = '2026-2';
+    const TIPO_ETS_DEFAULT = 'ORDINARIO/FUERA DE CALENDARIO';
+
+    const JEFATURAS = [
+      'FORMACIÓN BÁSICA',
+      'ADMINISTRACIÓN Y DESARROLLO EMPRESARIAL',
+      'CONTADOR PÚBLICO',
+      'LICENCIATURA EN NEGOCIOS DIGITALES',
+      'LICENCIATURA EN MERCADOTECNIA DIGITAL',
+      'NEGOCIOS INTERNACIONALES',
+      'RELACIONES COMERCIALES'
+    ];
+
+    // Default Preloaded Teachers Catalog (RFC + Official Name)
+    const DEFAULT_DOCENTES = [
+      { rfc: "LOPE820315M42", nombre: "MTRO. EDUARDO LÓPEZ PEÑA" },
+      { rfc: "ROGR751020HJ9", nombre: "DRA. ROSAURA GONZÁLEZ RÍOS" },
+      { rfc: "MEDA880704KL1", nombre: "LIC. ALEJANDRO MEDINA DÍAZ" },
+      { rfc: "HERC790919PQ5", nombre: "ING. CARLOS HERNÁNDEZ CRUZ" },
+      { rfc: "VEGR840228RS3", nombre: "DRA. REBECA VEGA GARCÍA" },
+      { rfc: "SANM811112TX7", nombre: "DR. MANUEL SANTOS MORALES" },
+      { rfc: "VARJ900401UY8", nombre: "MTRA. JULIA VARGAS RANGEL" },
+      { rfc: "CAST830814BC2", nombre: "LIC. TOMÁS CASTILLO AGUILAR" },
+      { rfc: "BENF760630DE4", nombre: "ING. FERNANDO BENÍTEZ SOTO" },
+      { rfc: "AGUL850125FG6", nombre: "MTRA. LUCÍA AGUILAR LARA" },
+      { rfc: "MORH801205JK8", nombre: "DR. HÉCTOR MORA HERRERA" },
+      { rfc: "ORTM770518LM0", nombre: "DRA. MARIANA ORTIZ MONTES" }
+    ];
+
+    // Default Sample Data mapped exactly to the 7 Departments
+    const DEFAULT_ETS_DATA = [
+      // FORMACIÓN BÁSICA
+      {
+        id: "ETS-1001",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "CP2020",
+        Jefatura: "FORMACIÓN BÁSICA",
+        Plan_estud: "2020",
+        Especialidad: "TRONCO COMÚN",
+        No_periodo: 1,
+        Num_materia: "FB101",
+        Materia: "FUNDAMENTOS DE MATEMÁTICAS",
+        Descripcion: "CÁLCULO Y ÁLGEBRA APLICADA A LOS NEGOCIOS",
+        TURNO: "MATUTINO",
+        reprobados: 138,
+        fecha: "2026-06-15",
+        hora: "08:00",
+        rfc_profesor: "HERC790919PQ5",
+        nombre_profesor: "ING. CARLOS HERNÁNDEZ CRUZ"
+      },
+      {
+        id: "ETS-1002",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LND2021",
+        Jefatura: "FORMACIÓN BÁSICA",
+        Plan_estud: "2021",
+        Especialidad: "TRONCO COMÚN",
+        No_periodo: 1,
+        Num_materia: "FB102",
+        Materia: "ESTADÍSTICA DESCRIPTIVA",
+        Descripcion: "ANÁLISIS ESTADÍSTICO DE DATOS EMPRESARIALES",
+        TURNO: "VESPERTINO",
+        reprobados: 104,
+        fecha: "2026-06-15",
+        hora: "16:00",
+        rfc_profesor: "HERC790919PQ5",
+        nombre_profesor: "ING. CARLOS HERNÁNDEZ CRUZ"
+      },
+      {
+        id: "ETS-1003",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LRC2020",
+        Jefatura: "FORMACIÓN BÁSICA",
+        Plan_estud: "2020",
+        Especialidad: "TRONCO COMÚN",
+        No_periodo: 2,
+        Num_materia: "FB201",
+        Materia: "COMUNICACIÓN Y HABILIDADES DIRECTIVAS",
+        Descripcion: "EXPRESIÓN ORAL Y ESCRITA EJECUTIVA",
+        TURNO: "MATUTINO",
+        reprobados: 42,
+        fecha: "",
+        hora: "",
+        rfc_profesor: "",
+        nombre_profesor: ""
+      },
+
+      // ADMINISTRACIÓN Y DESARROLLO EMPRESARIAL
+      {
+        id: "ETS-2001",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LADE2020",
+        Jefatura: "ADMINISTRACIÓN Y DESARROLLO EMPRESARIAL",
+        Plan_estud: "2020",
+        Especialidad: "GESTIÓN ESTRATÉGICA",
+        No_periodo: 3,
+        Num_materia: "AD301",
+        Materia: "ADMINISTRACIÓN ESTRATÉGICA GLOBAL",
+        Descripcion: "MODELOS CONTEMPORÁNEOS DE GESTIÓN",
+        TURNO: "MATUTINO",
+        reprobados: 87,
+        fecha: "2026-06-16",
+        hora: "10:00",
+        rfc_profesor: "LOPE820315M42",
+        nombre_profesor: "MTRO. EDUARDO LÓPEZ PEÑA"
+      },
+      {
+        id: "ETS-2002",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LADE2020",
+        Jefatura: "ADMINISTRACIÓN Y DESARROLLO EMPRESARIAL",
+        Plan_estud: "2020",
+        Especialidad: "CAPITAL HUMANO",
+        No_periodo: 4,
+        Num_materia: "AD405",
+        Materia: "COMPORTAMIENTO ORGANIZACIONAL",
+        Descripcion: "LIDERAZGO Y GESTIÓN DEL CAMBIO",
+        TURNO: "VESPERTINO",
+        reprobados: 63,
+        fecha: "",
+        hora: "",
+        rfc_profesor: "",
+        nombre_profesor: ""
+      },
+
+      // CONTADOR PÚBLICO
+      {
+        id: "ETS-3001",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "CP2020",
+        Jefatura: "CONTADOR PÚBLICO",
+        Plan_estud: "2020",
+        Especialidad: "FISCAL",
+        No_periodo: 2,
+        Num_materia: "CP204",
+        Materia: "CONTABILIDAD FINANCIERA INTERMEDIA",
+        Descripcion: "NORMAS DE INFORMACIÓN FINANCIERA NIF",
+        TURNO: "MATUTINO",
+        reprobados: 165,
+        fecha: "2026-06-17",
+        hora: "08:00",
+        rfc_profesor: "ROGR751020HJ9",
+        nombre_profesor: "DRA. ROSAURA GONZÁLEZ RÍOS"
+      },
+      {
+        id: "ETS-3002",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "CP2020",
+        Jefatura: "CONTADOR PÚBLICO",
+        Plan_estud: "2020",
+        Especialidad: "COSTOS",
+        No_periodo: 5,
+        Num_materia: "CP502",
+        Materia: "SISTEMAS DE COSTOS INDUSTRIALES",
+        Descripcion: "DETERMINACIÓN Y ANÁLISIS DE COSTOS",
+        TURNO: "VESPERTINO",
+        reprobados: 92,
+        fecha: "",
+        hora: "",
+        rfc_profesor: "",
+        nombre_profesor: ""
+      },
+
+      // LICENCIATURA EN NEGOCIOS DIGITALES
+      {
+        id: "ETS-4001",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LND2021",
+        Jefatura: "LICENCIATURA EN NEGOCIOS DIGITALES",
+        Plan_estud: "2021",
+        Especialidad: "ECOMMERCE",
+        No_periodo: 3,
+        Num_materia: "ND302",
+        Materia: "ARQUITECTURA DE NEGOCIOS ELECTRÓNICOS",
+        Descripcion: "PLATAFORMAS Y PASARELAS DIGITALES",
+        TURNO: "MATUTINO",
+        reprobados: 76,
+        fecha: "2026-06-18",
+        hora: "12:00",
+        rfc_profesor: "BENF760630DE4",
+        nombre_profesor: "ING. FERNANDO BENÍTEZ SOTO"
+      },
+      {
+        id: "ETS-4002",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LND2021",
+        Jefatura: "LICENCIATURA EN NEGOCIOS DIGITALES",
+        Plan_estud: "2021",
+        Especialidad: "BIG DATA",
+        No_periodo: 5,
+        Num_materia: "ND501",
+        Materia: "ANALÍTICA DE DATOS PARA DECISIONES",
+        Descripcion: "BUSINESS INTELLIGENCE Y DASHBOARDS",
+        TURNO: "VESPERTINO",
+        reprobados: 54,
+        fecha: "",
+        hora: "",
+        rfc_profesor: "",
+        nombre_profesor: ""
+      },
+
+      // LICENCIATURA EN MERCADOTECNIA DIGITAL
+      {
+        id: "ETS-5001",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LMD2021",
+        Jefatura: "LICENCIATURA EN MERCADOTECNIA DIGITAL",
+        Plan_estud: "2021",
+        Especialidad: "PUBLICIDAD DIGITAL",
+        No_periodo: 2,
+        Num_materia: "MD203",
+        Materia: "PUBLICIDAD EN REDES Y BUSCADORES (SEM/SEO)",
+        Descripcion: "OPTIMIZACIÓN DE CONTENIDO Y ADS",
+        TURNO: "MATUTINO",
+        reprobados: 81,
+        fecha: "2026-06-19",
+        hora: "10:00",
+        rfc_profesor: "VARJ900401UY8",
+        nombre_profesor: "MTRA. JULIA VARGAS RANGEL"
+      },
+      {
+        id: "ETS-5002",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LMD2021",
+        Jefatura: "LICENCIATURA EN MERCADOTECNIA DIGITAL",
+        Plan_estud: "2021",
+        Especialidad: "INBOUND MARKETING",
+        No_periodo: 4,
+        Num_materia: "MD404",
+        Materia: "METRICAS Y PERFORMANCE DIGITAL",
+        Descripcion: "KPIs, CONVERSIÓN Y ROI",
+        TURNO: "VESPERTINO",
+        reprobados: 49,
+        fecha: "",
+        hora: "",
+        rfc_profesor: "",
+        nombre_profesor: ""
+      },
+
+      // NEGOCIOS INTERNACIONALES
+      {
+        id: "ETS-6001",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LNI2020",
+        Jefatura: "NEGOCIOS INTERNACIONALES",
+        Plan_estud: "2020",
+        Especialidad: "ADUANAS",
+        No_periodo: 4,
+        Num_materia: "NI401",
+        Materia: "LEGISLACIÓN ADUANERA MEXICANA",
+        Descripcion: "RÉGIMEN ADUANERO Y CLASIFICACIÓN ARANCELARIA",
+        TURNO: "MATUTINO",
+        reprobados: 118,
+        fecha: "2026-06-16",
+        hora: "12:00",
+        rfc_profesor: "SANM811112TX7",
+        nombre_profesor: "DR. MANUEL SANTOS MORALES"
+      },
+      {
+        id: "ETS-6002",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LNI2020",
+        Jefatura: "NEGOCIOS INTERNACIONALES",
+        Plan_estud: "2020",
+        Especialidad: "LOGÍSTICA",
+        No_periodo: 6,
+        Num_materia: "NI603",
+        Materia: "LOGÍSTICA INTERNACIONAL Y TRANSPORTE",
+        Descripcion: "CADENAS DE SUMINISTRO GLOBALES",
+        TURNO: "VESPERTINO",
+        reprobados: 67,
+        fecha: "",
+        hora: "",
+        rfc_profesor: "",
+        nombre_profesor: ""
+      },
+
+      // RELACIONES COMERCIALES
+      {
+        id: "ETS-7001",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LRC2020",
+        Jefatura: "RELACIONES COMERCIALES",
+        Plan_estud: "2020",
+        Especialidad: "VENTAS",
+        No_periodo: 3,
+        Num_materia: "RC301",
+        Materia: "ADMINISTRACIÓN DE VENTAS Y DISTRIBUCIÓN",
+        Descripcion: "PLANIFICACIÓN DE CANALES Y EQUIPOS",
+        TURNO: "MATUTINO",
+        reprobados: 94,
+        fecha: "2026-06-17",
+        hora: "14:00",
+        rfc_profesor: "CAST830814BC2",
+        nombre_profesor: "LIC. TOMÁS CASTILLO AGUILAR"
+      },
+      {
+        id: "ETS-7002",
+        PERIODO_ETS: "2026-2",
+        Tipo_ETS: "ORDINARIO/FUERA DE CALENDARIO",
+        Clave_Carrera: "LRC2020",
+        Jefatura: "RELACIONES COMERCIALES",
+        Plan_estud: "2020",
+        Especialidad: "INVESTIGACIÓN DE MERCADOS",
+        No_periodo: 5,
+        Num_materia: "RC503",
+        Materia: "INVESTIGACIÓN CUALITATIVA DE MERCADOS",
+        Descripcion: "FOCUS GROUPS Y COMPORTAMIENTO DEL CONSUMIDOR",
+        TURNO: "VESPERTINO",
+        reprobados: 88,
+        fecha: "",
+        hora: "",
+        rfc_profesor: "",
+        nombre_profesor: ""
+      }
+    ];
+
+    /* =========================================================================
+       2. APPLICATION STATE
+       ========================================================================= */
+    let etsList = [];
+    let docentesList = [];
+    let conflictSet = new Set(); // Stores IDs of items that clash
+
+    /* =========================================================================
+       3. INITIALIZATION & STORAGE MANAGEMENT
+       ========================================================================= */
+    function initSystem() {
+      // 1. Populate Jefaturas in Select
+      const selectJefatura = document.getElementById('filterJefatura');
+      const jefaturasOptions = JEFATURAS.map(j => `<option value="${j}">${j}</option>`).join('');
+      selectJefatura.innerHTML = `
+        <option value="ALL">🏢 [TODAS] Vista Administrador - Gestión Escolar</option>
+        ${jefaturasOptions}
+      `;
+
+      // 2. Load LocalStorage or defaults
+      loadStorage();
+
+      // 3. Attach Events
+      setupEventListeners();
+
+      // 4. Render everything
+      renderAll();
+    }
+
+    function loadStorage() {
+      const savedETS = localStorage.getItem(STORAGE_KEY_ETS);
+      const savedDocentes = localStorage.getItem(STORAGE_KEY_DOCENTES);
+
+      if (savedETS) {
+        try {
+          etsList = JSON.parse(savedETS);
+        } catch(e) {
+          etsList = JSON.parse(JSON.stringify(DEFAULT_ETS_DATA));
+        }
+      } else {
+        etsList = JSON.parse(JSON.stringify(DEFAULT_ETS_DATA));
+      }
+
+      if (savedDocentes) {
+        try {
+          docentesList = JSON.parse(savedDocentes);
+        } catch(e) {
+          docentesList = JSON.parse(JSON.stringify(DEFAULT_DOCENTES));
+        }
+      } else {
+        docentesList = JSON.parse(JSON.stringify(DEFAULT_DOCENTES));
+      }
+    }
+
+    function saveStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY_ETS, JSON.stringify(etsList));
+        localStorage.setItem(STORAGE_KEY_DOCENTES, JSON.stringify(docentesList));
+      } catch (err) {
+        console.warn('Storage limit or error', err);
+      }
+    }
+
+    function resetToDemo() {
+      etsList = JSON.parse(JSON.stringify(DEFAULT_ETS_DATA));
+      docentesList = JSON.parse(JSON.stringify(DEFAULT_DOCENTES));
+      saveStorage();
+      renderAll();
+      showToast('Datos de demostración y catálogo restablecidos.', 'info');
+    }
+
+    /* =========================================================================
+       4. CONFLICT DETECTION LOGIC (Same Docente, Same Date, Same Hour)
+       ========================================================================= */
+    function checkConflicts() {
+      conflictSet.clear();
+      const mapSlots = {}; // Key: "RFC|FECHA|HORA" -> [itemIds]
+      const conflictsDetails = [];
+
+      etsList.forEach(item => {
+        if (item.rfc_profesor && item.fecha && item.hora) {
+          const key = `${item.rfc_profesor.trim().toUpperCase()}|${item.fecha}|${item.hora}`;
+          if (!mapSlots[key]) {
+            mapSlots[key] = [];
+          }
+          mapSlots[key].push(item);
+        }
+      });
+
+      for (const key in mapSlots) {
+        const group = mapSlots[key];
+        if (group.length > 1) {
+          group.forEach(item => conflictSet.add(item.id));
+          const doc = group[0].nombre_profesor || group[0].rfc_profesor;
+          const fecha = group[0].fecha;
+          const hora = group[0].hora;
+          conflictsDetails.push(`${doc} tiene ${group.length} exámenes simultáneos el día ${fecha} a las ${hora}`);
+        }
+      }
+
+      // Update banner & metrics UI
+      const count = conflictsDetails.length;
+      const metricEl = document.getElementById('metricConflictsCount');
+      const metricSub = document.getElementById('metricConflictsSub');
+      const iconContainer = document.getElementById('conflictIconContainer');
+      const icon = document.getElementById('conflictIcon');
+      const alertBanner = document.getElementById('conflictAlertBanner');
+      const alertText = document.getElementById('conflictAlertText');
+
+      if (count > 0) {
+        metricEl.textContent = count;
+        metricEl.className = 'text-xl font-bold text-rose-600';
+        metricSub.textContent = 'Requiere atención inmediata';
+        metricSub.className = 'text-[11px] text-rose-600 font-semibold';
+        iconContainer.className = 'w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-lg animate-pulse';
+        icon.className = 'fa-solid fa-triangle-exclamation';
+
+        alertBanner.classList.remove('hidden');
+        alertText.innerHTML = conflictsDetails.map(c => `• ${c}`).join('<br>');
+      } else {
+        metricEl.textContent = '0';
+        metricEl.className = 'text-xl font-bold text-emerald-600';
+        metricSub.textContent = 'Sin traslapes de horario';
+        metricSub.className = 'text-[11px] text-emerald-600 font-medium';
+        iconContainer.className = 'w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg';
+        icon.className = 'fa-solid fa-shield-check';
+
+        alertBanner.classList.add('hidden');
+      }
+    }
+
+    /* =========================================================================
+       5. FILTERING & SEARCH
+       ========================================================================= */
+    function getFilteredList() {
+      const jVal = document.getElementById('filterJefatura').value;
+      const tVal = document.getElementById('filterTurno').value;
+      const sVal = document.getElementById('filterSemestre').value;
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+      return etsList.filter(item => {
+        // Jefatura filter
+        if (jVal !== 'ALL' && item.Jefatura !== jVal) return false;
+
+        // Turno filter
+        if (tVal !== 'ALL' && item.TURNO !== tVal) return false;
+
+        // Semestre filter
+        if (sVal !== 'ALL' && String(item.No_periodo) !== sVal) return false;
+
+        // Live text search
+        if (query) {
+          const matchMateria = (item.Materia || '').toLowerCase().includes(query);
+          const matchNum = (item.Num_materia || '').toLowerCase().includes(query);
+          const matchProf = (item.nombre_profesor || '').toLowerCase().includes(query);
+          const matchRfc = (item.rfc_profesor || '').toLowerCase().includes(query);
+          const matchCarrera = (item.Clave_Carrera || '').toLowerCase().includes(query);
+          if (!matchMateria && !matchNum && !matchProf && !matchRfc && !matchCarrera) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
+    /* =========================================================================
+       6. RENDERING TABLE & UI
+       ========================================================================= */
+    function renderAll() {
+      checkConflicts();
+      renderMetrics();
+      renderTable();
+      renderDocentesModalList();
+      document.getElementById('countDocentesBadge').textContent = docentesList.length;
+    }
+
+    function renderMetrics() {
+      const total = etsList.length;
+      const completed = etsList.filter(i => i.fecha && i.hora && i.rfc_profesor).length;
+      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      document.getElementById('metricTotal').textContent = total;
+      document.getElementById('metricCompleted').textContent = completed;
+      document.getElementById('metricProgressPercent').textContent = percent + '%';
+      document.getElementById('metricProgressBar').style.width = percent + '%';
+
+      // Reprobados total
+      const totalReprobados = etsList.reduce((acc, curr) => acc + (Number(curr.reprobados) || 0), 0);
+      document.getElementById('metricHighDemandCount').textContent = totalReprobados.toLocaleString('es-MX');
+
+      // Jefatura text badge
+      const jVal = document.getElementById('filterJefatura').value;
+      const jText = jVal === 'ALL' ? 'Todas (Gestión Escolar)' : jVal;
+      document.getElementById('metricActiveJefatura').textContent = jText;
+      document.getElementById('metricActiveJefatura').title = jText;
+
+      const filteredCount = getFilteredList().length;
+      document.getElementById('metricJefaturaCount').textContent = filteredCount;
+      document.getElementById('filteredRowsCount').textContent = filteredCount;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('etsTableBody');
+      const emptyState = document.getElementById('emptyState');
+      const filtered = getFilteredList();
+
+      document.getElementById('tableShowingCount').textContent = filtered.length;
+      
+      const searchVal = document.getElementById('searchInput').value;
+      const btnClear = document.getElementById('btnClearSearch');
+      if (searchVal) {
+        btnClear.classList.remove('hidden');
+        document.getElementById('searchResultCount').textContent = `${filtered.length} encontrados`;
+      } else {
+        btnClear.classList.add('hidden');
+        document.getElementById('searchResultCount').textContent = '';
+      }
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      let html = '';
+      filtered.forEach((item, index) => {
+        const isConflict = conflictSet.has(item.id);
+        const isComplete = Boolean(item.fecha && item.hora && item.rfc_profesor);
+        
+        let rowClass = "hover:bg-slate-50/80 transition-colors";
+        let statusBadge = '';
+
+        if (isConflict) {
+          rowClass = "bg-rose-50/70 hover:bg-rose-100/50";
+          statusBadge = `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-full" title="Empalme con otro examen de este profesor"><i class="fa-solid fa-triangle-exclamation"></i> Empalme</span>`;
+        } else if (isComplete) {
+          statusBadge = `<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full"><i class="fa-solid fa-check"></i> Listo</span>`;
+        } else {
+          statusBadge = `<span class="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full"><i class="fa-solid fa-clock"></i> Pendiente</span>`;
+        }
+
+        // Reprobados badge intensity
+        const rep = Number(item.reprobados) || 0;
+        let repBadgeClass = "bg-slate-100 text-slate-700";
+        if (rep > 100) repBadgeClass = "bg-rose-100 text-rose-700 font-bold border border-rose-200";
+        else if (rep > 50) repBadgeClass = "bg-amber-100 text-amber-700 font-semibold border border-amber-200";
+
+        html += `
+          <tr class="${rowClass} border-b border-slate-100" data-id="${item.id}">
+            <!-- # Index -->
+            <td class="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">${index + 1}</td>
+
+            <!-- Carrera / Plan -->
+            <td class="py-2.5 px-3">
+              <span class="font-bold text-slate-700 block">${item.Clave_Carrera || 'N/A'}</span>
+              <span class="text-[10px] text-slate-400">Plan ${item.Plan_estud || '2020'}</span>
+            </td>
+
+            <!-- Semestre / Turno -->
+            <td class="py-2.5 px-3">
+              <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${item.TURNO === 'MATUTINO' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'}">
+                Sem. ${item.No_periodo} • ${item.TURNO === 'MATUTINO' ? 'MAT' : 'VESP'}
+              </span>
+            </td>
+
+            <!-- Materia / Unidad -->
+            <td class="py-2.5 px-3">
+              <div class="font-semibold text-slate-800">${item.Materia || 'Sin Nombre'}</div>
+              <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                <span class="font-mono bg-slate-100 px-1 py-0.2 rounded text-slate-600">${item.Num_materia || '-'}</span>
+                <span>•</span>
+                <span class="truncate max-w-[220px]" title="${item.Jefatura}">${item.Jefatura}</span>
+              </div>
+            </td>
+
+            <!-- Histórico Reprobados -->
+            <td class="py-2.5 px-3 text-center">
+              <span class="inline-block px-2 py-0.5 rounded-full text-xs font-mono ${repBadgeClass}" title="Total reprobados en 4 periodos anteriores para estimar cupo y salones">
+                ${rep}
+              </span>
+            </td>
+
+            <!-- Fecha Examen -->
+            <td class="py-2.5 px-3">
+              <input type="date" 
+                class="w-full text-xs border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-ipn-maroon"
+                value="${item.fecha || ''}"
+                onchange="updateRowField('${item.id}', 'fecha', this.value)">
+            </td>
+
+            <!-- Hora (24h) -->
+            <td class="py-2.5 px-3">
+              <select class="w-full text-xs border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-ipn-maroon"
+                onchange="updateRowField('${item.id}', 'hora', this.value)">
+                <option value="">--:--</option>
+                <option value="08:00" ${item.hora === '08:00' ? 'selected' : ''}>08:00 hrs</option>
+                <option value="10:00" ${item.hora === '10:00' ? 'selected' : ''}>10:00 hrs</option>
+                <option value="12:00" ${item.hora === '12:00' ? 'selected' : ''}>12:00 hrs</option>
+                <option value="14:00" ${item.hora === '14:00' ? 'selected' : ''}>14:00 hrs</option>
+                <option value="16:00" ${item.hora === '16:00' ? 'selected' : ''}>16:00 hrs</option>
+                <option value="18:00" ${item.hora === '18:00' ? 'selected' : ''}>18:00 hrs</option>
+                <option value="20:00" ${item.hora === '20:00' ? 'selected' : ''}>20:00 hrs</option>
+              </select>
+            </td>
+
+            <!-- Autocomplete Docente -->
+            <td class="py-2.5 px-3 relative">
+              <div class="relative">
+                <input type="text"
+                  placeholder="Asignar por nombre o RFC..."
+                  class="w-full text-xs border ${isConflict ? 'border-rose-400 focus:ring-rose-500' : 'border-slate-300 focus:ring-ipn-maroon'} rounded px-2 py-1 bg-white focus:outline-none focus:ring-1"
+                  value="${item.nombre_profesor ? `${item.nombre_profesor} (${item.rfc_profesor})` : ''}"
+                  oninput="handleTeacherSearch(this, '${item.id}')"
+                  onfocus="handleTeacherSearch(this, '${item.id}')">
+                
+                ${item.rfc_profesor ? `
+                  <button type="button" 
+                    title="Remover docente"
+                    class="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600 text-xs"
+                    onclick="clearDocente('${item.id}')">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                ` : ''}
+
+                <!-- Dropdown suggestions container -->
+                <div id="suggestions-${item.id}" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-300 shadow-xl rounded-lg z-30 max-h-48 overflow-y-auto"></div>
+              </div>
+            </td>
+
+            <!-- Estado -->
+            <td class="py-2.5 px-3 text-center">
+              ${statusBadge}
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    /* =========================================================================
+       7. ROW UPDATES & AUTOCOMPLETE LOGIC
+       ========================================================================= */
+    function updateRowField(id, field, value) {
+      const item = etsList.find(i => i.id === id);
+      if (item) {
+        item[field] = value;
+        saveStorage();
+        renderAll();
+      }
+    }
+
+    function clearDocente(id) {
+      const item = etsList.find(i => i.id === id);
+      if (item) {
+        item.rfc_profesor = '';
+        item.nombre_profesor = '';
+        saveStorage();
+        renderAll();
+        showToast('Docente removido de la materia.', 'info');
+      }
+    }
+
+    function handleTeacherSearch(inputEl, id) {
+      const query = inputEl.value.trim().toLowerCase();
+      const container = document.getElementById(`suggestions-${id}`);
+      if (!container) return;
+
+      const matches = docentesList.filter(d => 
+        d.nombre.toLowerCase().includes(query) || d.rfc.toLowerCase().includes(query)
+      ).slice(0, 6);
+
+      if (matches.length === 0) {
+        container.innerHTML = `<div class="p-2 text-[11px] text-slate-400 text-center">No se encontraron docentes con ese criterio</div>`;
+        container.classList.remove('hidden');
+        return;
+      }
+
+      let itemsHtml = '';
+      matches.forEach(doc => {
+        itemsHtml += `
+          <div class="px-3 py-2 text-xs hover:bg-slate-100 cursor-pointer border-b border-slate-100 last:border-b-0"
+               onclick="selectDocenteForRow('${id}', '${doc.rfc}', '${escapeHtml(doc.nombre)}')">
+            <div class="font-semibold text-slate-800">${doc.nombre}</div>
+            <div class="text-[10px] text-ipn-maroon font-mono font-bold">${doc.rfc}</div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = itemsHtml;
+      container.classList.remove('hidden');
+    }
+
+    function selectDocenteForRow(itemId, rfc, nombre) {
+      const item = etsList.find(i => i.id === itemId);
+      if (item) {
+        item.rfc_profesor = rfc;
+        item.nombre_profesor = nombre;
+        saveStorage();
+        renderAll();
+        showToast(`Profesor asignado: ${nombre}`, 'success');
+      }
+    }
+
+    // Close autocomplete suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('td.relative')) {
+        document.querySelectorAll('[id^="suggestions-"]').forEach(el => el.classList.add('hidden'));
+      }
+    });
+
+    /* =========================================================================
+       8. BATCH ACTIONS (APPLY DATE / TIME TO VISIBLE ROWS)
+       ========================================================================= */
+    function applyBatchToVisible() {
+      const batchDate = document.getElementById('batchDate').value;
+      const batchTime = document.getElementById('batchTime').value;
+
+      if (!batchDate && !batchTime) {
+        showToast('Selecciona al menos una Fecha o una Hora para aplicar en lote.', 'warning');
+        return;
+      }
+
+      const visibleRows = getFilteredList();
+      if (visibleRows.length === 0) {
+        showToast('No hay materias visibles para actualizar.', 'warning');
+        return;
+      }
+
+      visibleRows.forEach(item => {
+        if (batchDate) item.fecha = batchDate;
+        if (batchTime) item.hora = batchTime;
+      });
+
+      saveStorage();
+      renderAll();
+      showToast(`Se actualizaron ${visibleRows.length} materias visibles exitosamente.`, 'success');
+    }
+
+    function clearBatchVisible() {
+      const visibleRows = getFilteredList();
+      if (visibleRows.length === 0) return;
+
+      visibleRows.forEach(item => {
+        item.fecha = '';
+        item.hora = '';
+      });
+
+      saveStorage();
+      renderAll();
+      showToast(`Se limpió la programación de ${visibleRows.length} materias.`, 'info');
+    }
+
+    /* =========================================================================
+       9. EXCEL IMPORT & EXPORT (SheetJS)
+       ========================================================================= */
+    function handleExcelUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+
+          // 1. Check for 'docentes' sheet
+          const sheetDocentesName = workbook.SheetNames.find(n => n.toLowerCase().includes('docente') || n.toLowerCase().includes('profesor'));
+          if (sheetDocentesName) {
+            const rawDocentes = XLSX.utils.sheet_to_json(workbook.Sheets[sheetDocentesName]);
+            if (rawDocentes && rawDocentes.length > 0) {
+              const importedDocs = [];
+              rawDocentes.forEach(row => {
+                const rfc = (row['RFC'] || row['rfc'] || row['Rfc'] || '').toString().trim().toUpperCase();
+                const nom = (row['NOMBRE'] || row['Nombre'] || row['nombre'] || row['DOCENTE'] || '').toString().trim();
+                if (rfc && nom) {
+                  importedDocs.push({ rfc, nombre: nom });
+                }
+              });
+              if (importedDocs.length > 0) {
+                docentesList = importedDocs;
+              }
+            }
+          }
+
+          // 2. Check for 'ETS' sheet or fallback to first sheet
+          const sheetETSName = workbook.SheetNames.find(n => n.toUpperCase().includes('ETS')) || workbook.SheetNames[0];
+          const rawETS = XLSX.utils.sheet_to_json(workbook.Sheets[sheetETSName]);
+
+          if (!rawETS || rawETS.length === 0) {
+            showToast('El archivo no contiene filas válidas en la hoja de ETS.', 'error');
+            return;
+          }
+
+          const parsedETS = rawETS.map((row, idx) => {
+            // Flexible keys fallback matching official template
+            const periodo = row['PERIODO_ETS'] || row['PERIODO'] || PERIOD_DEFAULT;
+            const tipo = row['Tipo_ETS'] || row['TIPO_ETS'] || TIPO_ETS_DEFAULT;
+            const carrera = row['Clave Carrera'] || row['Clave_Carrera'] || row['CARRERA'] || 'GENÉRICA';
+            const jefatura = row['Jefatura'] || row['JEFATURA'] || 'FORMACIÓN BÁSICA';
+            const plan = row['Plan_estud'] || row['PLAN_ESTUD'] || '2020';
+            const especialidad = row['Especialidad'] || row['ESPECIALIDAD'] || 'TRONCO COMÚN';
+            const sem = row['No_periodo'] || row['NO_PERIODO'] || row['SEMESTRE'] || 1;
+            const numMat = row['Num_materia'] || row['NUM_MATERIA'] || `MAT-${idx+1}`;
+            const nomMat = row['Materia'] || row['MATERIA'] || row['NOMBRE_MATERIA'] || 'Unidad de Aprendizaje';
+            const desc = row['Descripcion'] || row['DESCRIPCION'] || '';
+            const turno = (row['TURNO'] || row['Turno'] || 'MATUTINO').toString().toUpperCase();
+            const reprobados = Number(row['# Reprobados'] || row['REPROBADOS'] || row['Reprobados']) || 0;
+            
+            // Format dates if parsed as Excel Serial numbers or strings
+            let fechaStr = '';
+            if (row['Fecha']) {
+              if (typeof row['Fecha'] === 'number') {
+                const dateObj = XLSX.SSF.parse_date_code(row['Fecha']);
+                fechaStr = `${dateObj.y}-${String(dateObj.m).padStart(2,'0')}-${String(dateObj.d).padStart(2,'0')}`;
+              } else {
+                fechaStr = String(row['Fecha']).trim();
+              }
+            }
+
+            let horaStr = (row['Hora'] || row['HORA'] || '').toString().trim();
+            const rfcProf = (row['RFC'] || row['rfc_profesor'] || row['RFC_PROFESOR'] || '').toString().trim();
+            const nomProf = (row['Profesor'] || row['nombre_profesor'] || row['NOMBRE_PROFESOR'] || '').toString().trim();
+
+            return {
+              id: `ETS-IMP-${Date.now()}-${idx}`,
+              PERIODO_ETS: periodo,
+              Tipo_ETS: tipo,
+              Clave_Carrera: carrera,
+              Jefatura: jefatura,
+              Plan_estud: plan,
+              Especialidad: especialidad,
+              No_periodo: sem,
+              Num_materia: numMat,
+              Materia: nomMat,
+              Descripcion: desc,
+              TURNO: turno,
+              reprobados: reprobados,
+              fecha: fechaStr,
+              hora: horaStr,
+              rfc_profesor: rfcProf,
+              nombre_profesor: nomProf
+            };
+          });
+
+          etsList = parsedETS;
+          saveStorage();
+          renderAll();
+          showToast(`Plantilla procesada con éxito: ${parsedETS.length} materias cargadas.`, 'success');
+        } catch (error) {
+          console.error(error);
+          showToast('Error al procesar el archivo Excel. Verifique el formato.', 'error');
+        } finally {
+          event.target.value = '';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function exportToExcelSAES() {
+      if (etsList.length === 0) {
+        showToast('No hay registros para exportar.', 'warning');
+        return;
+      }
+
+      // 1. Structure ETS Sheet according to official template columns
+      const exportRows = etsList.map(item => ({
+        "PERIODO_ETS": item.PERIODO_ETS || PERIOD_DEFAULT,
+        "Tipo_ETS": item.Tipo_ETS || TIPO_ETS_DEFAULT,
+        "Clave Carrera": item.Clave_Carrera || '',
+        "Jefatura": item.Jefatura || '',
+        "Plan_estud": item.Plan_estud || '',
+        "Especialidad": item.Especialidad || '',
+        "No_periodo": item.No_periodo || '',
+        "Num_materia": item.Num_materia || '',
+        "Materia": item.Materia || '',
+        "Descripcion": item.Descripcion || '',
+        "TURNO": item.TURNO || '',
+        "Fecha (AAAA-MM-DD)": item.fecha || '',
+        "Hora (24 hrs)": item.hora || '',
+        "RFC Profesor": item.rfc_profesor || '',
+        "Nombre Profesor": item.nombre_profesor || '',
+        "# Reprobados 4 Periodos": item.reprobados || 0
+      }));
+
+      // 2. Structure Docentes Sheet
+      const docentesRows = docentesList.map(d => ({
+        "RFC": d.rfc,
+        "NOMBRE DOCENTE": d.nombre
+      }));
+
+      // Create Workbook
+      const wb = XLSX.utils.book_new();
+
+      const wsETS = XLSX.utils.json_to_sheet(exportRows);
+      XLSX.utils.book_append_sheet(wb, wsETS, "ETS");
+
+      const wsDocentes = XLSX.utils.json_to_sheet(docentesRows);
+      XLSX.utils.book_append_sheet(wb, wsDocentes, "docentes");
+
+      // Set nice column widths for ETS sheet
+      wsETS['!cols'] = [
+        { wch: 14 }, // Periodo
+        { wch: 32 }, // Tipo
+        { wch: 14 }, // Clave
+        { wch: 35 }, // Jefatura
+        { wch: 12 }, // Plan
+        { wch: 22 }, // Especialidad
+        { wch: 12 }, // No Periodo
+        { wch: 14 }, // Num Materia
+        { wch: 38 }, // Materia
+        { wch: 35 }, // Descripcion
+        { wch: 14 }, // Turno
+        { wch: 18 }, // Fecha
+        { wch: 14 }, // Hora
+        { wch: 18 }, // RFC
+        { wch: 35 }, // Nombre
+        { wch: 22 }  // Reprobados
+      ];
+
+      const fileName = `Programacion_ETS_${PERIOD_DEFAULT}_SAES.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      showToast(`Archivo oficial generado: ${fileName}`, 'success');
+    }
+
+    /* =========================================================================
+       10. MODAL: DOCENTES MANAGEMENT
+       ========================================================================= */
+    function renderDocentesModalList(filter = '') {
+      const tbody = document.getElementById('docentesModalList');
+      const q = filter.trim().toLowerCase();
+      
+      const filtered = docentesList.filter(d => 
+        d.nombre.toLowerCase().includes(q) || d.rfc.toLowerCase().includes(q)
+      );
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-center text-slate-400">No se encontraron docentes</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      filtered.forEach((d, index) => {
+        html += `
+          <tr class="hover:bg-slate-50">
+            <td class="px-3 py-2 font-mono font-bold text-ipn-maroon">${d.rfc}</td>
+            <td class="px-3 py-2 text-slate-700 font-medium">${d.nombre}</td>
+            <td class="px-3 py-2 text-center">
+              <button onclick="removeDocente('${d.rfc}')" class="text-slate-400 hover:text-rose-600 transition p-1" title="Eliminar de catálogo">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function addDocenteFromModal() {
+      const rfcInput = document.getElementById('newDocenteRfc');
+      const nomInput = document.getElementById('newDocenteNombre');
+      const rfc = rfcInput.value.trim().toUpperCase();
+      const nombre = nomInput.value.trim().toUpperCase();
+
+      if (!rfc || !nombre) {
+        showToast('Complete RFC y Nombre del docente.', 'warning');
+        return;
+      }
+
+      const existing = docentesList.find(d => d.rfc === rfc);
+      if (existing) {
+        existing.nombre = nombre;
+        showToast('Docente actualizado en el catálogo.', 'info');
+      } else {
+        docentesList.push({ rfc, nombre });
+        showToast('Nuevo docente agregado al catálogo.', 'success');
+      }
+
+      rfcInput.value = '';
+      nomInput.value = '';
+      saveStorage();
+      renderAll();
+      renderDocentesModalList();
+    }
+
+    function removeDocente(rfc) {
+      docentesList = docentesList.filter(d => d.rfc !== rfc);
+      saveStorage();
+      renderAll();
+      renderDocentesModalList();
+      showToast('Docente retirado del catálogo.', 'info');
+    }
+
+    /* =========================================================================
+       11. TOAST NOTIFICATION UTILITY
+       ========================================================================= */
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      let bg = 'bg-slate-900 text-white';
+      let icon = 'fa-circle-info text-sky-400';
+
+      if (type === 'success') {
+        bg = 'bg-emerald-900 text-emerald-50 border border-emerald-700';
+        icon = 'fa-circle-check text-emerald-400';
+      } else if (type === 'warning') {
+        bg = 'bg-amber-900 text-amber-50 border border-amber-700';
+        icon = 'fa-triangle-exclamation text-amber-400';
+      } else if (type === 'error') {
+        bg = 'bg-rose-900 text-rose-50 border border-rose-700';
+        icon = 'fa-circle-xmark text-rose-400';
+      }
+
+      toast.className = `${bg} pointer-events-auto px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-medium transition-all duration-300 transform translate-y-3 opacity-0`;
+      toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+      
+      container.appendChild(toast);
+
+      // Animate In
+      setTimeout(() => {
+        toast.classList.remove('translate-y-3', 'opacity-0');
+      }, 10);
+
+      // Auto Dismiss
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-4');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    /* =========================================================================
+       12. EVENT LISTENERS
+       ========================================================================= */
+    function setupEventListeners() {
+      // Filters
+      document.getElementById('filterJefatura').addEventListener('change', renderAll);
+      document.getElementById('filterTurno').addEventListener('change', renderAll);
+      document.getElementById('filterSemestre').addEventListener('change', renderAll);
+      document.getElementById('searchInput').addEventListener('input', renderAll);
+
+      document.getElementById('btnClearSearch').addEventListener('click', () => {
+        document.getElementById('searchInput').value = '';
+        renderAll();
+      });
+
+      // Batch Actions
+      document.getElementById('btnApplyBatch').addEventListener('click', applyBatchToVisible);
+      document.getElementById('btnClearBatch').addEventListener('click', clearBatchVisible);
+
+      // Excel Upload & Export
+      document.getElementById('excelFileInput').addEventListener('change', handleExcelUpload);
+      document.getElementById('btnExportExcel').addEventListener('click', exportToExcelSAES);
+
+      // Demo reset
+      document.getElementById('btnResetDemo').addEventListener('click', () => {
+        resetToDemo();
+      });
+
+      // Docentes Modal
+      const modal = document.getElementById('modalDocentes');
+      document.getElementById('btnOpenDocentes').addEventListener('click', () => {
+        modal.classList.remove('hidden');
+        renderDocentesModalList();
+      });
+      document.getElementById('btnCloseModalDocentes').addEventListener('click', () => modal.classList.add('hidden'));
+      document.getElementById('btnDoneModalDocentes').addEventListener('click', () => modal.classList.add('hidden'));
+      document.getElementById('btnAddDocente').addEventListener('click', addDocenteFromModal);
+      document.getElementById('searchDocentesModal').addEventListener('input', (e) => {
+        renderDocentesModalList(e.target.value);
+      });
+    }
+
+    // Run on startup
+    window.addEventListener('DOMContentLoaded', initSystem);
+  </script>
+</body>
+</html>
