@@ -161,7 +161,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 <!-- Select Jefatura -->
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Jefatura de Departamento:</label>
@@ -196,6 +196,20 @@
                     </select>
                 </div>
 
+                                <!-- Select Plan de Estudios -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Plan de Estudios:</label>
+                    <select id="filter-plan" onchange="aplicarFiltros()" class="w-full text-xs border border-slate-300 rounded-lg p-2 font-medium bg-white focus:outline-none focus:ring-2 focus:ring-ipn-guinda text-slate-800">
+                        <option value="TODOS">-- Todos los Planes --</option>
+                        <option value="9">Plan 9 (2009)</option>
+                        <option value="12">Plan 12 (2012)</option>
+                        <option value="20">Plan 20 (2020)</option>
+                        <option value="21">Plan 21 (2021)</option>
+                        <option value="22">Plan 22 (2022)</option>
+                        <option value="24">Plan 24 (2024)</option>
+                    </select>
+                </div>
+
                 <!-- Buscador de Texto -->
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Buscar Materia o Clave:</label>
@@ -219,8 +233,16 @@
                         <i class="fa-solid fa-bolt text-yellow-400"></i>
                         <span>Aplicar a Todo el Filtro</span>
                     </button>
-                    <button onclick="limpiarProgramacionLote()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold px-2.5 py-1.5 rounded border border-rose-200 transition">
+                    <button onclick="limpiarProgramacionLote()" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold px-2.5 py-1.5 rounded border border-amber-200 transition">
                         Limpiar Horarios
+                    </button>
+                    <button onclick="eliminarMateriasFiltradas()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold px-2.5 py-1.5 rounded border border-rose-200 transition flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>Quitar Materias Filtradas</span>
+                    </button>
+                    <button onclick="restablecerMateriasOficiales()" title="Restaura las 1,090 materias originales" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-2.5 py-1.5 rounded border border-slate-300 transition flex items-center gap-1">
+                        <i class="fa-solid fa-rotate-left"></i>
+                        <span>Restablecer Listado (1,090)</span>
                     </button>
                 </div>
             </div>
@@ -245,6 +267,7 @@
                         <tr>
                             <th class="p-2.5 border-b border-slate-700 text-center w-12">#</th>
                             <th class="p-2.5 border-b border-slate-700 w-16 text-center">Carrera</th>
+                            <th class="p-2.5 border-b border-slate-700 w-14 text-center">Plan</th>
                             <th class="p-2.5 border-b border-slate-700 w-24">Clave</th>
                             <th class="p-2.5 border-b border-slate-700 min-w-[200px]">Materia / Unidad de Aprendizaje</th>
                             <th class="p-2.5 border-b border-slate-700 text-center w-20">Semestre</th>
@@ -255,6 +278,7 @@
                             <th class="p-2.5 border-b border-slate-700 min-w-[260px]">Docente Asignado (Hoja 2)</th>
                             <th class="p-2.5 border-b border-slate-700 w-28 text-center">RFC Docente</th>
                             <th class="p-2.5 border-b border-slate-700 text-center w-14">Estado</th>
+                            <th class="p-2.5 border-b border-slate-700 text-center w-12">Quitar</th>
                         </tr>
                     </thead>
                     <tbody id="tabla-cuerpo" class="divide-y divide-slate-200">
@@ -473,12 +497,14 @@
         // FILTROS
         function obtenerFiltrados() {
             const jefatura = document.getElementById('filter-jefatura').value;
+            const plan = document.getElementById('filter-plan').value;
             const periodo = document.getElementById('filter-periodo').value;
             const turno = document.getElementById('filter-turno').value;
             const search = document.getElementById('search-materia').value.toLowerCase().trim();
 
             return listETS.map((item, originalIndex) => ({ item, originalIndex })).filter(({ item }) => {
                 if (jefatura !== 'TODAS' && item.jefatura !== jefatura) return false;
+                if (plan !== 'TODOS' && String(item.plan) !== plan) return false;
                 if (periodo !== 'TODOS' && String(item.noPeriodo) !== periodo) return false;
                 if (turno !== 'TODOS' && item.turno !== turno) return false;
                 if (search) {
@@ -501,6 +527,7 @@
 
         function filtrarEmpalmes() {
             document.getElementById('filter-jefatura').value = 'TODAS';
+            if (document.getElementById('filter-plan')) document.getElementById('filter-plan').value = 'TODOS';
             document.getElementById('filter-periodo').value = 'TODOS';
             document.getElementById('filter-turno').value = 'TODOS';
             document.getElementById('search-materia').value = '';
@@ -518,7 +545,7 @@
             tbody.innerHTML = '';
 
             if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="12" class="text-center py-8 text-slate-400 font-semibold">No se encontraron materias con los filtros seleccionados.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="13" class="text-center py-8 text-slate-400 font-semibold">No se encontraron materias con los filtros seleccionados.</td></tr>`;
                 return;
             }
 
@@ -543,6 +570,7 @@
                 tr.innerHTML = `
                     <td class="p-2 text-center text-slate-400 font-medium">${idx + 1}</td>
                     <td class="p-2 text-center font-bold text-slate-700">${item.carrera || '-'}</td>
+                    <td class="p-2 text-center font-mono font-bold text-slate-500 bg-slate-50/50">${item.plan || '-'}</td>
                     <td class="p-2 font-mono font-bold text-ipn-guinda">${item.clave || '-'}</td>
                     <td class="p-2">
                         <div class="font-bold text-slate-800">${item.descripcion || '-'}</div>
@@ -593,10 +621,60 @@
                             )
                         }
                     </td>
+
+                    <!-- Quitar Fila -->
+                    <td class="p-2 text-center">
+                        <button onclick="eliminarMateria(${originalIndex})" title="Quitar materia del listado" class="text-slate-300 hover:text-rose-600 transition p-1">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
                 `;
 
                 tbody.appendChild(tr);
             });
+        }
+
+        
+        // GESTIÓN DE ELIMINACIÓN DE MATERIAS
+        function eliminarMateria(index) {
+            const mat = listETS[index];
+            if (!mat) return;
+            const desc = mat.descripcion || mat.clave || 'esta materia';
+            const turno = mat.turno || '';
+            if (confirm(`¿Deseas quitar del listado la materia: ${desc} (${turno})?`)) {
+                listETS.splice(index, 1);
+                guardarDatos();
+                verificarEmpalmes();
+                aplicarFiltros();
+                actualizarEstadisticas();
+            }
+        }
+
+        function eliminarMateriasFiltradas() {
+            const filtrados = obtenerFiltrados();
+            if (filtrados.length === 0) {
+                alert("No hay materias visibles con el filtro actual para quitar.");
+                return;
+            }
+            if (confirm(`¿Estás seguro de que deseas quitar ${filtrados.length} materia(s) que están actualmente visibles en el filtro?`)) {
+                // Creamos un set con los índices originales ordenados de mayor a menor para hacer splice seguro
+                const indicesAEliminar = new Set(filtrados.map(f => f.originalIndex));
+                listETS = listETS.filter((_, idx) => !indicesAEliminar.has(idx));
+                guardarDatos();
+                verificarEmpalmes();
+                aplicarFiltros();
+                actualizarEstadisticas();
+            }
+        }
+
+        function restablecerMateriasOficiales() {
+            if (confirm("¿Deseas restaurar el listado oficial completo con las 1,090 materias originales? (Cualquier horario capturado volverá a los valores iniciales)")) {
+                listETS = JSON.parse(JSON.stringify(MATERIAS_INICIALES));
+                guardarDatos();
+                verificarEmpalmes();
+                aplicarFiltros();
+                actualizarEstadisticas();
+            }
         }
 
         // ACTUALIZACIÓN DE FILAS
