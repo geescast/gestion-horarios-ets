@@ -140,7 +140,7 @@
         <div id="alert-empalmes" class="hidden bg-rose-50 border-l-4 border-rose-600 p-3 rounded shadow-sm flex items-center justify-between">
             <div class="flex items-center space-x-3 text-rose-800 text-xs font-medium">
                 <i class="fa-solid fa-circle-exclamation text-base"></i>
-                <span id="alert-empalmes-text">Atención: Existen profesores programados a la misma fecha y hora.</span>
+                <span id="alert-empalmes-text">Atención: Existen profesores programados a la misma fecha y hora en materias diferentes.</span>
             </div>
             <button onclick="filtrarEmpalmes()" class="text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1 rounded">
                 Ver empalmes
@@ -154,8 +154,17 @@
                     <i class="fa-solid fa-filter text-ipn-guinda"></i>
                     <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Filtros de Búsqueda y Selección</h2>
                 </div>
-                <div class="text-xs text-slate-500 font-medium">
-                    Modalidad Escolarizada | Filtrado por Jefatura, Plan, Semestre y Turno
+
+                <!-- SWITCH ESPEJO (VINCULACIÓN TRONCO COMÚN) -->
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="sync-espejo-checkbox" checked class="sr-only peer">
+                        <div class="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-ipn-guinda"></div>
+                    </label>
+                    <span class="text-xs font-bold text-slate-700 flex items-center gap-1" title="Al asignar fecha/hora/docente a una materia de tronco común (ej. C101), se replicará automáticamente a las materias espejo de otras carreras (ej. A101, R101, N101)">
+                        <i class="fa-solid fa-link text-ipn-guinda text-[11px]"></i>
+                        <span>Replicar automáticamente en Materias Espejo (Tronco Común)</span>
+                    </span>
                 </div>
             </div>
 
@@ -254,6 +263,7 @@
                 </div>
                 <div class="flex items-center gap-4">
                     <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Completo</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> Espejo / Tronco Común</span>
                     <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-amber-400 inline-block"></span> Parcial</span>
                     <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span> Empalme Docente</span>
                 </div>
@@ -471,10 +481,17 @@
         let listDocentes = [];
         let listETS = [];
         let empalmesSet = new Set();
+        let espejosSet = new Set();
+
+        // Normalizar texto para comparaciones de materias espejo
+        function normalizarTexto(txt) {
+            if (!txt) return '';
+            return txt.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toUpperCase();
+        }
 
         // INICIALIZACIÓN
         function initSystem() {
-            const storedDocentes = localStorage.getItem('ets_docentes_ipn_v5');
+            const storedDocentes = localStorage.getItem('ets_docentes_ipn_v7');
             if (storedDocentes) {
                 try {
                     listDocentes = JSON.parse(storedDocentes);
@@ -483,10 +500,10 @@
                 }
             } else {
                 listDocentes = [...DOCENTES_OFICIALES];
-                localStorage.setItem('ets_docentes_ipn_v5', JSON.stringify(listDocentes));
+                localStorage.setItem('ets_docentes_ipn_v7', JSON.stringify(listDocentes));
             }
 
-            const storedETS = localStorage.getItem('ets_materias_ipn_v5');
+            const storedETS = localStorage.getItem('ets_materias_ipn_v7');
             if (storedETS) {
                 try {
                     listETS = JSON.parse(storedETS);
@@ -495,7 +512,7 @@
                 }
             } else {
                 listETS = JSON.parse(JSON.stringify(MATERIAS_INICIALES));
-                localStorage.setItem('ets_materias_ipn_v5', JSON.stringify(listETS));
+                localStorage.setItem('ets_materias_ipn_v7', JSON.stringify(listETS));
             }
 
             actualizarDatalistDocentes();
@@ -509,7 +526,7 @@
         function restablecerDocentesOficiales() {
             if (confirm("¿Deseas restaurar la lista oficial con los 996 profesores iniciales?")) {
                 listDocentes = [...DOCENTES_OFICIALES];
-                localStorage.setItem('ets_docentes_ipn_v5', JSON.stringify(listDocentes));
+                localStorage.setItem('ets_docentes_ipn_v7', JSON.stringify(listDocentes));
                 actualizarDatalistDocentes();
                 renderDocentesModalTable();
                 document.getElementById('count-docentes-btn').innerText = listDocentes.length;
@@ -547,9 +564,10 @@
             });
         }
 
-        // VERIFICAR EMPALMES
+        // VERIFICAR EMPALMES Y DETECTAR MATERIAS ESPEJO
         function verificarEmpalmes() {
             empalmesSet.clear();
+            espejosSet.clear();
             const mapaOcupacion = {};
 
             listETS.forEach((item, index) => {
@@ -564,8 +582,29 @@
             });
 
             for (const key in mapaOcupacion) {
-                if (mapaOcupacion[key].length > 1) {
-                    mapaOcupacion[key].forEach(idx => empalmesSet.add(idx));
+                const indices = mapaOcupacion[key];
+                if (indices.length > 1) {
+                    // Verificar si todas las materias con esta misma fecha/hora/docente son la misma materia espejo
+                    // (mismo plan, mismo turno y misma descripción normalizada)
+                    const primera = listETS[indices[0]];
+                    const primerPlan = String(primera.plan || '').trim();
+                    const primerTurno = String(primera.turno || '').trim().toUpperCase();
+                    const primeraDesc = normalizarTexto(primera.descripcion);
+
+                    const sonTodasEspejo = indices.every(idx => {
+                        const m = listETS[idx];
+                        return String(m.plan || '').trim() === primerPlan &&
+                               String(m.turno || '').trim().toUpperCase() === primerTurno &&
+                               normalizarTexto(m.descripcion) === primeraDesc;
+                    });
+
+                    if (sonTodasEspejo) {
+                        // Son materias espejo / tronco común unificadas: ¡NO es un empalme indebido!
+                        indices.forEach(idx => espejosSet.add(idx));
+                    } else {
+                        // Sí es un conflicto real: el profesor tiene materias diferentes a la misma hora
+                        indices.forEach(idx => empalmesSet.add(idx));
+                    }
                 }
             }
 
@@ -576,7 +615,7 @@
 
             if (empalmesSet.size > 0) {
                 alertDiv.classList.remove('hidden');
-                alertText.innerText = `Atención: Se detectaron ${empalmesSet.size} materias con empalme de docente en la misma fecha y hora.`;
+                alertText.innerText = `Atención: Se detectaron ${empalmesSet.size} materias con empalme real de docente en materias diferentes a la misma hora.`;
             } else {
                 alertDiv.classList.add('hidden');
             }
@@ -639,11 +678,16 @@
 
             items.forEach(({ item, originalIndex }, idx) => {
                 const isEmpalme = empalmesSet.has(originalIndex);
+                const isEspejo = espejosSet.has(originalIndex);
                 const isComplete = item.fecha && item.hora && item.rfc;
                 const isPartial = (item.fecha || item.hora || item.rfc) && !isComplete;
 
                 let rowBg = "hover:bg-slate-50";
-                if (isEmpalme) rowBg = "bg-rose-50/70 hover:bg-rose-100/60";
+                if (isEmpalme) {
+                    rowBg = "bg-rose-50/80 hover:bg-rose-100/70";
+                } else if (isEspejo) {
+                    rowBg = "bg-blue-50/40 hover:bg-blue-100/50";
+                }
 
                 const tr = document.createElement('tr');
                 tr.className = `${rowBg} border-b border-slate-200 transition-colors`;
@@ -660,7 +704,10 @@
                     <td class="p-2 text-center font-mono font-bold text-slate-500 bg-slate-50/50">${item.plan || '-'}</td>
                     <td class="p-2 font-mono font-bold text-ipn-guinda">${item.clave || '-'}</td>
                     <td class="p-2">
-                        <div class="font-bold text-slate-800">${item.descripcion || '-'}</div>
+                        <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                            <span>${item.descripcion || '-'}</span>
+                            ${isEspejo ? '<span title="Materia de Tronco Común unificada simultáneamente con otra carrera" class="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-bold border border-blue-200"><i class="fa-solid fa-link text-[9px]"></i> Espejo</span>' : ''}
+                        </div>
                         <div class="text-[10px] text-slate-500">${item.jefatura || ''}</div>
                     </td>
                     <td class="p-2 text-center font-semibold text-slate-600">${item.noPeriodo || '-'}°</td>
@@ -698,12 +745,15 @@
                     <!-- Estado Indicador -->
                     <td class="p-2 text-center">
                         ${isEmpalme ? 
-                            '<span title="¡Empalme de Docente!" class="text-rose-600 text-sm cursor-pointer"><i class="fa-solid fa-triangle-exclamation animate-pulse"></i></span>' : 
-                            (isComplete ? 
-                                '<span title="Completo" class="text-emerald-500 text-sm"><i class="fa-solid fa-circle-check"></i></span>' : 
-                                (isPartial ? 
-                                    '<span title="Incompleto" class="text-amber-500 text-sm"><i class="fa-solid fa-clock"></i></span>' : 
-                                    '<span title="Pendiente" class="text-slate-300 text-sm"><i class="fa-regular fa-circle"></i></span>'
+                            '<span title="¡Empalme de Docente en materias distintas!" class="text-rose-600 text-sm cursor-pointer"><i class="fa-solid fa-triangle-exclamation animate-pulse"></i></span>' : 
+                            (isEspejo ? 
+                                '<span title="Tronco Común Unificado (Mismo profesor, fecha y hora)" class="text-blue-600 text-sm cursor-pointer"><i class="fa-solid fa-link"></i></span>' :
+                                (isComplete ? 
+                                    '<span title="Completo" class="text-emerald-500 text-sm"><i class="fa-solid fa-circle-check"></i></span>' : 
+                                    (isPartial ? 
+                                        '<span title="Incompleto" class="text-amber-500 text-sm"><i class="fa-solid fa-clock"></i></span>' : 
+                                        '<span title="Pendiente" class="text-slate-300 text-sm"><i class="fa-regular fa-circle"></i></span>'
+                                    )
                                 )
                             )
                         }
@@ -796,7 +846,6 @@
                 return;
             }
 
-            // Determinar clave de carrera
             let claveCarrera = 'A';
             if (jefatura === 'CONTADOR PÚBLICO') claveCarrera = 'C';
             else if (jefatura === 'NEGOCIOS INTERNACIONALES') claveCarrera = 'N';
@@ -850,9 +899,44 @@
             }, 1200);
         }
 
-        // ACTUALIZACIÓN DE FILAS
+        // REPLICAR A MATERIAS ESPEJO (MISMA DESCRIPCIÓN, PLAN Y TURNO)
+        function sincronizarConEspejos(index, campo, valor, profNombre) {
+            const syncCheckbox = document.getElementById('sync-espejo-checkbox');
+            if (!syncCheckbox || !syncCheckbox.checked) return;
+
+            const fuente = listETS[index];
+            if (!fuente) return;
+
+            const planFuente = String(fuente.plan || '').trim();
+            const turnoFuente = String(fuente.turno || '').trim().toUpperCase();
+            const descFuente = normalizarTexto(fuente.descripcion);
+
+            if (!descFuente) return;
+
+            listETS.forEach((item, idx) => {
+                if (idx !== index) {
+                    const planDest = String(item.plan || '').trim();
+                    const turnoDest = String(item.turno || '').trim().toUpperCase();
+                    const descDest = normalizarTexto(item.descripcion);
+
+                    if (planDest === planFuente && turnoDest === turnoFuente && descDest === descFuente) {
+                        item[campo] = valor;
+                        if (campo === 'rfc' && profNombre !== undefined) {
+                            item.profesorNombre = profNombre;
+                        }
+                    }
+                }
+            });
+        }
+
+        // ACTUALIZACIÓN DE FILAS CON SINCRONIZACIÓN ESPEJO
         function actualizarFila(index, campo, valor) {
-            listETS[index][campo] = valor.trim();
+            const valTrim = valor.trim();
+            listETS[index][campo] = valTrim;
+
+            // Replicar en materias espejo si aplica
+            sincronizarConEspejos(index, campo, valTrim);
+
             guardarDatos();
             verificarEmpalmes();
             renderTabla(obtenerFiltrados());
@@ -862,13 +946,24 @@
         function asignarDocenteFila(index, nombreOTexto) {
             const texto = nombreOTexto.trim().toUpperCase();
             const prof = listDocentes.find(d => d.nombre.toUpperCase() === texto || d.rfc.toUpperCase() === texto);
+            
+            let rfcAsignado = '';
+            let nombreAsignado = '';
+
             if (prof) {
-                listETS[index].rfc = prof.rfc;
-                listETS[index].profesorNombre = prof.nombre;
+                rfcAsignado = prof.rfc;
+                nombreAsignado = prof.nombre;
+                listETS[index].rfc = rfcAsignado;
+                listETS[index].profesorNombre = nombreAsignado;
             } else {
-                listETS[index].profesorNombre = nombreOTexto;
+                nombreAsignado = nombreOTexto;
+                listETS[index].profesorNombre = nombreAsignado;
                 listETS[index].rfc = '';
             }
+
+            // Replicar en materias espejo si aplica
+            sincronizarConEspejos(index, 'rfc', rfcAsignado, nombreAsignado);
+
             guardarDatos();
             verificarEmpalmes();
             renderTabla(obtenerFiltrados());
@@ -891,8 +986,14 @@
             if (!confirm(`¿Deseas aplicar esta fecha/hora a las ${filtrados.length} materias visibles en el filtro?`)) return;
 
             filtrados.forEach(({ originalIndex }) => {
-                if (fecha) listETS[originalIndex].fecha = fecha;
-                if (hora) listETS[originalIndex].hora = hora;
+                if (fecha) {
+                    listETS[originalIndex].fecha = fecha;
+                    sincronizarConEspejos(originalIndex, 'fecha', fecha);
+                }
+                if (hora) {
+                    listETS[originalIndex].hora = hora;
+                    sincronizarConEspejos(originalIndex, 'hora', hora);
+                }
             });
 
             guardarDatos();
@@ -910,6 +1011,8 @@
             filtrados.forEach(({ originalIndex }) => {
                 listETS[originalIndex].fecha = '';
                 listETS[originalIndex].hora = '';
+                sincronizarConEspejos(originalIndex, 'fecha', '');
+                sincronizarConEspejos(originalIndex, 'hora', '');
             });
 
             guardarDatos();
@@ -920,7 +1023,7 @@
 
         // GUARDADO LOCAL
         function guardarDatos() {
-            localStorage.setItem('ets_materias_ipn_v5', JSON.stringify(listETS));
+            localStorage.setItem('ets_materias_ipn_v7', JSON.stringify(listETS));
         }
 
         // ESTADÍSTICAS
@@ -1011,7 +1114,7 @@
                 msgDiv.innerText = `Docente ${nombre} agregado exitosamente.`;
             }
 
-            localStorage.setItem('ets_docentes_ipn_v5', JSON.stringify(listDocentes));
+            localStorage.setItem('ets_docentes_ipn_v7', JSON.stringify(listDocentes));
             rfcInput.value = '';
             nombreInput.value = '';
             actualizarDatalistDocentes();
@@ -1023,7 +1126,7 @@
         function eliminarDocente(rfc) {
             if (!confirm(`¿Eliminar al docente con RFC ${rfc}?`)) return;
             listDocentes = listDocentes.filter(d => d.rfc !== rfc);
-            localStorage.setItem('ets_docentes_ipn_v5', JSON.stringify(listDocentes));
+            localStorage.setItem('ets_docentes_ipn_v7', JSON.stringify(listDocentes));
             actualizarDatalistDocentes();
             renderDocentesModalTable();
             document.getElementById('count-docentes-btn').innerText = listDocentes.length;
@@ -1050,7 +1153,7 @@
                                 rfc: String(row['RFC'] || '').trim().toUpperCase(),
                                 nombre: String(row['NOMBRE_PROFESOR'] || '').trim().toUpperCase()
                             })).filter(d => d.rfc || d.nombre);
-                            localStorage.setItem('ets_docentes_ipn_v5', JSON.stringify(listDocentes));
+                            localStorage.setItem('ets_docentes_ipn_v7', JSON.stringify(listDocentes));
                             actualizarDatalistDocentes();
                             document.getElementById('count-docentes-btn').innerText = listDocentes.length;
                         }
@@ -1061,7 +1164,6 @@
                     if (sheetETS) {
                         const rawETS = XLSX.utils.sheet_to_json(sheetETS);
                         if (rawETS && rawETS.length > 0) {
-                            // Filtrar si trajera modalidad no escolarizada por error
                             const filteredRaw = rawETS.filter(row => {
                                 const c = String(row['Carrera'] || row['Jefatura'] || '');
                                 const clave = String(row['Clave Carrera'] || '');
@@ -1108,12 +1210,11 @@
         // EXPORTACIÓN A EXCEL EN EL FORMATO OFICIAL SAES
         function exportarExcelSAES() {
             if (empalmesSet.size > 0) {
-                if (!confirm(`Advertencia: Existen ${empalmesSet.size} asignaciones con empalme de profesor. ¿Deseas exportar el archivo de todos modos?`)) {
+                if (!confirm(`Advertencia: Existen ${empalmesSet.size} asignaciones con empalme real de profesor. ¿Deseas exportar el archivo de todos modos?`)) {
                     return;
                 }
             }
 
-            // Preparar datos hoja ETS (conservando la estructura exacta de 16 columnas SAES)
             const dataETS = listETS.map(item => ({
                 'PERIODO_ETS': item.periodo || '',
                 'Tipo_ETS': item.tipo || 'ORDINARIO/FUERA DE CALENDARIO',
@@ -1133,7 +1234,6 @@
                 '# Reprobados de 4 Periodos Esc. anteriores': item.reprobados !== undefined ? item.reprobados : 0
             }));
 
-            // Preparar datos hoja docentes
             const dataDocentes = listDocentes.map(d => ({
                 'RFC': d.rfc,
                 'NOMBRE_PROFESOR': d.nombre
@@ -1143,7 +1243,6 @@
             const wsETS = XLSX.utils.json_to_sheet(dataETS);
             const wsDocentes = XLSX.utils.json_to_sheet(dataDocentes);
 
-            // Anchos de columna
             wsETS['!cols'] = [
                 { wch: 14 }, { wch: 28 }, { wch: 14 }, { wch: 38 },
                 { wch: 12 }, { wch: 18 }, { wch: 20 }, { wch: 12 },
@@ -1162,7 +1261,6 @@
             XLSX.writeFile(wb, 'Carga_Masiva_ETS_Programada.xlsx');
         }
 
-        // ARRANQUE AUTOMÁTICO
         window.addEventListener('DOMContentLoaded', initSystem);
     </script>
 </body>
