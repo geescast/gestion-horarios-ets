@@ -45,6 +45,55 @@
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
 
+    <!-- Modal / Pantalla de Inicio de Sesión (Login) -->
+    <div id="login-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-300 border border-slate-200">
+            <div class="bg-gradient-to-r from-ipn-guindadark to-ipn-guinda p-6 text-white text-center relative">
+                <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg text-ipn-guinda text-2xl font-black">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h2 class="text-lg font-black uppercase tracking-wide">Acceso al Sistema ETS</h2>
+                <p class="text-xs text-rose-100 mt-1">ESCA Santo Tomás - Instituto Politécnico Nacional</p>
+            </div>
+            <div class="p-6 flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1"><i class="fa-solid fa-user text-ipn-guinda mr-1"></i> Usuario:</label>
+                    <input type="text" id="login-user" placeholder="Ingrese su usuario..." class="w-full text-xs border border-slate-300 rounded-lg p-2.5 font-medium focus:outline-none focus:ring-2 focus:ring-ipn-guinda bg-slate-50">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1"><i class="fa-solid fa-key text-ipn-guinda mr-1"></i> Contraseña:</label>
+                    <input type="password" id="login-pass" placeholder="••••••••" class="w-full text-xs border border-slate-300 rounded-lg p-2.5 font-medium focus:outline-none focus:ring-2 focus:ring-ipn-guinda bg-slate-50" onkeypress="if(event.key === 'Fila') doLogin()">
+                </div>
+                <div id="login-error" class="hidden text-xs text-rose-700 bg-rose-50 border border-rose-200 p-2 rounded-lg font-semibold text-center">
+                    Usuario o contraseña incorrectos.
+                </div>
+                <button onclick="doLogin()" class="w-full bg-ipn-guinda hover:bg-ipn-guindadark text-white font-bold py-2.5 rounded-lg shadow-md transition text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>Iniciar Sesión</span>
+                </button>
+                <div class="text-center pt-2 border-t border-slate-100 flex justify-between items-center text-[11px] text-slate-500">
+                    <span>Usuarios configurados: 11</span>
+                    <button onclick="toggleUsersList()" class="text-ipn-guinda font-bold hover:underline">Ver credenciales por defecto</button>
+                </div>
+                <div id="default-users-list" class="hidden bg-slate-100 p-3 rounded-lg text-[10px] text-slate-700 space-y-1 max-h-36 overflow-y-auto">
+                    <p class="font-bold text-slate-900 border-b pb-1 mb-1">Listado de los 11 usuarios autorizados:</p>
+                    <p>1. <b>admin</b> / ipn2026 (Administrador General)</p>
+                    <p>2. <b>jefatura_cp</b> / cp982026 (Contador Público)</p>
+                    <p>3. <b>jefatura_rc</b> / rc992026 (Relaciones Comerciales)</p>
+                    <p>4. <b>jefatura_ni</b> / ni942026 (Negocios Internacionales)</p>
+                    <p>5. <b>jefatura_ad</b> / ad122026 (Administración)</p>
+                    <p>6. <b>jefatura_nd</b> / nd202026 (Negocios Digitales)</p>
+                    <p>7. <b>jefatura_md</b> / md212026 (Mercadotecnia Digital)</p>
+                    <p>8. <b>FBDI</b> / fbdi2026 (Formación Básica)</p>
+                    <p>9. <b>SSEIS</b> / sseis2026 (SSEIS)</p>
+                    <p>10. <b>SUB_ACA</b> / subaca2026 (Subdirección Académica)</p>
+                    <p>11. <b>JDGE</b> / jdge2026 (Gestión Escolar / JDGE)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Header Institucional -->
     <header class="bg-gradient-to-r from-ipn-guindadark via-ipn-guinda to-[#801830] text-white shadow-lg sticky top-0 z-40 border-b-4 border-ipn-dorado">
         <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
@@ -1254,5 +1303,58 @@
 
         window.addEventListener('DOMContentLoaded', initSystem);
     </script>
+
+
+    <script>
+        const VALID_USERS = [
+            {user: "admin", pass: "ipn2026", role: "Administrador General"},
+            {user: "jefatura_cp", pass: "cp982026", role: "Jefatura Contador Público"},
+            {user: "jefatura_rc", pass: "rc992026", role: "Jefatura Relaciones Comerciales"},
+            {user: "jefatura_ni", pass: "ni942026", role: "Jefatura Negocios Internacionales"},
+            {user: "jefatura_ad", pass: "ad122026", role: "Jefatura Administración"},
+            {user: "jefatura_nd", pass: "nd202026", role: "Jefatura Negocios Digitales"},
+            {user: "jefatura_md", pass: "md212026", role: "Jefatura Mercadotecnia Digital"},
+            {user: "FBDI", pass: "fbdi2026", role: "Formación Básica y Disciplinaria"},
+            {user: "SSEIS", pass: "sseis2026", role: "SSEIS"},
+            {user: "SUB_ACA", pass: "subaca2026", role: "Subdirección Académica"},
+            {user: "JDGE", pass: "jdge2026", role: "Gestión Escolar / JDGE"}
+        ];
+
+        function checkSession() {
+            const session = localStorage.getItem('ets_session_user');
+            if (session) {
+                document.getElementById('login-overlay').classList.add('hidden');
+            } else {
+                document.getElementById('login-overlay').classList.remove('hidden');
+            }
+        }
+
+        function doLogin() {
+            const u = document.getElementById('login-user').value.trim();
+            const p = document.getElementById('login-pass').value.trim();
+            const err = document.getElementById('login-error');
+
+            const found = VALID_USERS.find(item => item.user === u && item.pass === p);
+            if (found) {
+                localStorage.setItem('ets_session_user', found.user);
+                localStorage.setItem('ets_session_role', found.role);
+                document.getElementById('login-overlay').classList.add('hidden');
+                err.classList.add('hidden');
+            } else {
+                err.classList.remove('hidden');
+            }
+        }
+
+        function toggleUsersList() {
+            const lst = document.getElementById('default-users-list');
+            lst.classList.toggle('hidden');
+        }
+
+        // Ejecutar verificación de sesión al cargar
+        window.addEventListener('DOMContentLoaded', () => {
+            checkSession();
+        });
+    </script>
+
 </body>
 </html>
