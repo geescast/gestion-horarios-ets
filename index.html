@@ -233,7 +233,8 @@
                     <select id="filter-plan" onchange="aplicarFiltros()" class="w-full text-xs border border-slate-300 rounded-lg p-2 font-medium bg-white focus:outline-none focus:ring-2 focus:ring-ipn-guinda text-slate-800">
                         <option value="TODOS">-- Todos los Planes --</option>
                         <option value="PLAN ANTERIOR">PLAN ANTERIOR</option>
-                        <option value="9">Plan 9</option>
+                        <option value="9">Plan 9 / 09</option>
+                        <option value="12">Plan 12</option>
                         <option value="12">Plan 12</option>
                         <option value="20">Plan 20</option>
                         <option value="21">Plan 21</option>
@@ -617,7 +618,7 @@
                 }
 
                 if (jefaturaVal !== "TODAS" && m.jefatura !== jefaturaVal) return false;
-                if (planVal !== "TODOS" && String(m.plan) !== planVal) return false;
+                if (planVal !== "TODOS" && String(m.plan) !== planVal && String(Number(m.plan)) !== String(Number(planVal))) return false;
                 if (periodoVal !== "TODOS" && String(m.noPeriodo) !== periodoVal) return false;
 
                 if (searchVal) {
