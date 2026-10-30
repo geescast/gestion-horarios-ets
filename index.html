@@ -578,7 +578,7 @@ function doLogin() {
             // Poblar también los planes dinámicamente para incluir 98, 09, 12, 20, 21, 22, 24, etc.
             const selectPlan = document.getElementById('filter-plan');
             const currentPlanVal = selectPlan.value;
-            selectPlan.innerHTML = '<option value="TODOS">-- Todos los Planes --</option><option value="PLAN ANTERIOR">PLAN ANTERIOR</option>';
+            selectPlan.innerHTML = '<option value="TODOS">-- Todos los Planes --</option>';
             
             let planesSet = new Set();
             stateMaterias.forEach(m => { if (m.plan !== undefined && m.plan !== "") planesSet.add(String(m.plan).trim()); });
