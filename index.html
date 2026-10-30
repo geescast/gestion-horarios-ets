@@ -535,7 +535,16 @@ function doLogin() {
             }
             const savedDoc = localStorage.getItem('ets_docentes_custom');
             if (savedDoc) {
-                try { stateDocentes = JSON.parse(savedDoc); } catch(e){}
+                try { 
+                    stateDocentes = JSON.parse(savedDoc); 
+                    if (!stateDocentes || stateDocentes.length === 0) {
+                        stateDocentes = JSON.parse(JSON.stringify(DOCENTES_OFICIALES));
+                    }
+                } catch(e) {
+                    stateDocentes = JSON.parse(JSON.stringify(DOCENTES_OFICIALES));
+                }
+            } else {
+                stateDocentes = JSON.parse(JSON.stringify(DOCENTES_OFICIALES));
             }
         }
 
