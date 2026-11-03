@@ -840,22 +840,14 @@ function doLogin() {
 
         function exportarExcelSAES() {
             let dataExport = stateMaterias.map((m, i) => ({
-                "PERIODO_ETS": m.periodo,
-                "Tipo_ETS": m.tipo,
-                "Clave Carrera": m.claveCarrera,
-                "Carrera": m.jefatura,
-                "Plan_estud": m.plan,
-                "Cve_especialidad": m.cveEsp,
-                "Especialidad": m.esp,
-                "No_periodo": m.noPeriodo,
-                "Num_materia": m.numMateria,
-                "Materia": m.clave,
-                "Descripcion": m.descripcion,
-                "TURNO": m.turno,
-                "Fecha AAAA-MM-DD": m.fecha,
-                "Hora 24 hrs": m.hora,
-                "RFC de profesor (opcional)": m.rfc,
-                "# Reprobados de 4 Periodos Esc. anteriores": m.reprobados
+                "Jefatura/Carrera": m.jefatura || "",
+                "Plan de Estudios": m.plan || "",
+                "Clave": m.clave || "",
+                "Descripción/Unidad de Aprendizaje": m.descripcion || "",
+                "Sem": m.noPeriodo || "",
+                "H.1": (m.fecha || m.hora) ? `${m.fecha || ''} ${m.hora || ''}`.trim() : "",
+                "Profesor /rfc": m.rfc || "",
+                "H.2 Profesor / RFC 2": `${(m.fecha2 || m.hora2) ? `${m.fecha2 || ''} ${m.hora2 || ''}`.trim() : ''} ${m.rfc2 || ''}`.trim()
             }));
 
             const ws = XLSX.utils.json_to_sheet(dataExport);
