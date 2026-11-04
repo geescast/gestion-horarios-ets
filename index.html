@@ -632,7 +632,9 @@ function doLogin() {
             const found = stateDocentes.find(d => d.rfc === rfc);
             return found ? `${found.nombre} (${found.rfc})` : rfc;
         }
-    ent.getElementById('docentes-datalist');
+
+        function poblarDatalistDocentes() {
+            const dl = document.getElementById('docentes-datalist');
             dl.innerHTML = '';
             stateDocentes.forEach(d => {
                 const opt = document.createElement('option');
