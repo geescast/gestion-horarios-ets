@@ -938,7 +938,7 @@ function doLogin() {
                     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                     const rows = XLSX.utils.sheet_to_json(firstSheet);
 
-                    stateMaterias = rows.map((r, idx) => ({
+                                        stateMaterias = rows.map((r, idx) => ({
                         id: idx + 1,
                         periodo: String(r['PERIODO_ETS'] || ''),
                         tipo: String(r['Tipo_ETS'] || 'ORDINARIO/FUERA DE CALENDARIO'),
@@ -947,7 +947,7 @@ function doLogin() {
                         plan: String(r['Plan_estud'] || ''),
                         cveEsp: String(r['Cve_especialidad'] || '0'),
                         esp: String(r['Especialidad'] || 'SIN ESPECIALIDAD'),
-                        noPeriodo: String(r['No_periodo'] || '1'),
+                        noPeriodo: String(r['No_periodo'] !== undefined ? r['No_periodo'] : (r['SEM/NIV'] !== undefined ? r['SEM/NIV'] : '1')),
                         numMateria: String(r['Num_materia'] || ''),
                         clave: String(r['Materia'] || ''),
                         descripcion: String(r['Descripcion'] || ''),
