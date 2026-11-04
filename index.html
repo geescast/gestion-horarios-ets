@@ -296,11 +296,8 @@
                             <th class="p-2.5 border-b border-slate-700 text-center w-10">#</th>
                             <th class="p-2.5 border-b border-slate-700 w-16 text-center">Clave Cve</th>
                             <th class="p-2.5 border-b border-slate-700 w-14 text-center">Plan</th>
-                            <th class="p-2.5 border-b border-slate-700 w-16 text-center bg-slate-900 text-yellow-300">No. Mat</th>
-                            <th class="p-2.5 border-b border-slate-700 w-24">Materia</th>
                             <th class="p-2.5 border-b border-slate-700 min-w-[210px]">Descripción / Unidad de Aprendizaje</th>
-                            <th class="p-2.5 border-b border-slate-700 text-center w-14">Sem</th>
-                            <th class="p-2.5 border-b border-slate-700 text-center w-16">Hist. Rep.</th>
+                            <th class="p-2.5 border-b border-slate-700 text-center w-20">SEM/NIV</th>
                             <th class="p-2.5 border-b border-slate-700 min-w-[340px]">Programación de Horarios (Horario 1 y Horario 2)</th>
                             <th class="p-2.5 border-b border-slate-700 text-center w-14">Estado</th>
                             <th class="p-2.5 border-b border-slate-700 text-center w-12">Quitar</th>
@@ -728,7 +725,7 @@ function doLogin() {
             document.getElementById('visible-count').innerText = lista.length;
 
             if (lista.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" class="text-center p-6 text-slate-400 font-semibold">No se encontraron materias con los filtros seleccionados.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center p-6 text-slate-400 font-semibold">No se encontraron materias con los filtros seleccionados.</td></tr>';
                 return;
             }
 
@@ -750,11 +747,8 @@ function doLogin() {
                     <td class="p-2.5 text-center font-bold text-slate-500">${idx + 1}</td>
                     <td class="p-2.5 text-center font-mono font-bold text-ipn-guinda">${m.clave}</td>
                     <td class="p-2.5 text-center font-semibold text-slate-600">${m.plan}</td>
-                    <td class="p-2.5 text-center font-mono font-bold bg-slate-100 text-slate-800">${m.numMateria}</td>
-                    <td class="p-2.5 font-semibold text-slate-800">${m.claveCarrera}</td>
                     <td class="p-2.5 font-medium text-slate-900">${m.descripcion} ${m.turno ? `<span class="bg-blue-100 text-blue-800 text-[9px] px-1.5 py-0.5 rounded font-bold ml-1">${m.turno}</span>` : ``}<br><span class="text-[10px] text-slate-500">${m.jefatura}</span></td>
                     <td class="p-2.5 text-center font-bold">${m.noPeriodo}º</td>
-                    <td class="p-2.5 text-center font-bold text-slate-600">${m.reprobados}</td>
                     <td class="p-2.5 space-y-1">
                         <!-- Horario 1 -->
                         <div class="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded border border-slate-200">
