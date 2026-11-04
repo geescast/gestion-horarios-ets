@@ -255,7 +255,7 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <input type="date" id="batch-date" class="text-xs border border-slate-300 rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-ipn-guinda">
-                    <input type="time" id="batch-time" class="text-xs border border-slate-300 rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-ipn-guinda">
+                    <input type="time" step="1800" id="batch-time" class="text-xs border border-slate-300 rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-ipn-guinda">
                     <button onclick="aplicarProgramacionLote()" class="text-xs bg-slate-800 hover:bg-slate-900 text-white font-semibold px-3 py-1.5 rounded transition shadow-sm flex items-center gap-1">
                         <i class="fa-solid fa-bolt text-yellow-400"></i>
                         <span>Aplicar al Filtro</span>
@@ -602,14 +602,37 @@ function doLogin() {
         }
 
         
-        function getDocenteDisplay(rfc) {
+        
+        function formatDateDMY(dateStr) {
+            if (!dateStr) return '';
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            return dateStr;
+        }
+
+        function formatDateTimeExcel(dateStr, timeStr) {
+            if (!dateStr && !timeStr) return '';
+            const d = formatDateDMY(dateStr);
+            const t = timeStr || '';
+            if (d && t) return `${d} ${t}`;
+            return d || t;
+        }
+
+        function getDocenteFullExport(rfc) {
             if (!rfc || rfc === "SIN ASIGNAR") return '';
             const found = stateDocentes.find(d => d.rfc === rfc);
             return found ? `${found.nombre} (${found.rfc})` : rfc;
         }
 
-function renderDatalistDocentes() {
-            const dl = document.getElementById('docentes-datalist');
+
+        function getDocenteDisplay(rfc) {
+            if (!rfc || rfc === "SIN ASIGNAR") return '';
+            const found = stateDocentes.find(d => d.rfc === rfc);
+            return found ? `${found.nombre} (${found.rfc})` : rfc;
+        }
+    ent.getElementById('docentes-datalist');
             dl.innerHTML = '';
             stateDocentes.forEach(d => {
                 const opt = document.createElement('option');
@@ -691,14 +714,14 @@ function renderDatalistDocentes() {
                         <div class="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded border border-slate-200">
                             <span class="text-[10px] font-bold text-slate-500 w-12">H.1:</span>
                             <input type="date" value="${m.fecha || ''}" onchange="actualizarDato(${m.id}, 'fecha', this.value)" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda">
-                            <input type="time" value="${m.hora || ''}" onchange="actualizarDato(${m.id}, 'hora', this.value)" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda">
+                            <input type="time" step="1800" value="${m.hora || ''}" onchange="actualizarDato(${m.id}, 'hora', this.value)" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda">
                             <input type="text" list="docentes-datalist" value="${getDocenteDisplay(m.rfc)}" placeholder="Profesor / RFC" onchange="actualizarDocente(${m.id}, 'rfc', this.value)" class="flex-1 text-[11px] border border-slate-300 rounded p-1 uppercase focus:ring-1 focus:ring-ipn-guinda font-mono">
                         </div>
                         <!-- Horario 2 (Opcional) -->
                         <div class="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded border border-slate-200">
                             <span class="text-[10px] font-bold text-slate-500 w-12">H.2:</span>
                             <input type="date" value="${m.fecha2 || ''}" onchange="actualizarDato(${m.id}, 'fecha2', this.value)" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda">
-                            <input type="time" value="${m.hora2 || ''}" onchange="actualizarDato(${m.id}, 'hora2', this.value)" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda">
+                            <input type="time" step="1800" value="${m.hora2 || ''}" onchange="actualizarDato(${m.id}, 'hora2', this.value)" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda">
                             <input type="text" list="docentes-datalist" value="${getDocenteDisplay(m.rfc2)}" placeholder="Profesor / RFC 2" onchange="actualizarDocente(${m.id}, 'rfc2', this.value)" class="flex-1 text-[11px] border border-slate-300 rounded p-1 uppercase focus:ring-1 focus:ring-ipn-guinda font-mono">
                         </div>
                     </td>
@@ -852,10 +875,10 @@ function renderDatalistDocentes() {
                 "Clave": m.clave || "",
                 "Descripción/Unidad de Aprendizaje": m.descripcion || "",
                 "Sem": m.noPeriodo || "",
-                "H.1": (m.fecha || m.hora) ? `${m.fecha || ''} ${m.hora || ''}`.trim() : "",
-                "Profesor /rfc": m.rfc || "",
-                "H.2": (m.fecha2 || m.hora2) ? `${m.fecha2 || ''} ${m.hora2 || ''}`.trim() : "",
-                "Profesor / RFC 2": m.rfc2 || ""
+                "H.1": formatDateTimeExcel(m.fecha, m.hora),
+                "Profesor /rfc": getDocenteFullExport(m.rfc),
+                "H.2": formatDateTimeExcel(m.fecha2, m.hora2),
+                "Profesor / RFC 2": getDocenteFullExport(m.rfc2)
             }));
 
             const ws = XLSX.utils.json_to_sheet(dataExport);
