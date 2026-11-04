@@ -255,7 +255,7 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <input type="date" id="batch-date" class="text-xs border border-slate-300 rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-ipn-guinda">
-                    <input type="time" step="1800" id="batch-time" class="text-xs border border-slate-300 rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-ipn-guinda">
+                    <select id="batch-time" class="text-xs border border-slate-300 rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-ipn-guinda bg-white font-mono font-bold"><option value="">-- Hora --</option><option value="07:00">07:00</option><option value="07:30">07:30</option><option value="08:00">08:00</option><option value="08:30">08:30</option><option value="09:00">09:00</option><option value="09:30">09:30</option><option value="10:00">10:00</option><option value="10:30">10:30</option><option value="11:00">11:00</option><option value="11:30">11:30</option><option value="12:00">12:00</option><option value="12:30">12:30</option><option value="13:00">13:00</option><option value="13:30">13:30</option><option value="14:00">14:00</option><option value="14:30">14:30</option><option value="15:00">15:00</option><option value="15:30">15:30</option><option value="16:00">16:00</option><option value="16:30">16:30</option><option value="17:00">17:00</option><option value="17:30">17:30</option><option value="18:00">18:00</option><option value="18:30">18:30</option><option value="19:00">19:00</option><option value="19:30">19:30</option><option value="20:00">20:00</option><option value="20:30">20:30</option><option value="21:00">21:00</option><option value="21:30">21:30</option><option value="22:00">22:00</option><option value="22:30">22:30</option></select>
                     <button onclick="aplicarProgramacionLote()" class="text-xs bg-slate-800 hover:bg-slate-900 text-white font-semibold px-3 py-1.5 rounded transition shadow-sm flex items-center gap-1">
                         <i class="fa-solid fa-bolt text-yellow-400"></i>
                         <span>Aplicar al Filtro</span>
@@ -716,14 +716,14 @@ function doLogin() {
                         <div class="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded border border-slate-200">
                             <span class="text-[10px] font-bold text-slate-500 w-12">H.1:</span>
                             <input type="date" value="${m.fecha || ''}" onchange="actualizarDato(${m.id}, 'fecha', this.value)" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda">
-                            <input type="time" step="1800" value="${m.hora || ''}" onchange="actualizarDato(${m.id}, 'hora', this.value)" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda">
+                            ${getHourSelectHTML(m.hora, `actualizarDato(${m.id}, \'hora\', this.value)`)}
                             <input type="text" list="docentes-datalist" value="${getDocenteDisplay(m.rfc)}" placeholder="Profesor / RFC" onchange="actualizarDocente(${m.id}, 'rfc', this.value)" class="flex-1 text-[11px] border border-slate-300 rounded p-1 uppercase focus:ring-1 focus:ring-ipn-guinda font-mono">
                         </div>
                         <!-- Horario 2 (Opcional) -->
                         <div class="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded border border-slate-200">
                             <span class="text-[10px] font-bold text-slate-500 w-12">H.2:</span>
                             <input type="date" value="${m.fecha2 || ''}" onchange="actualizarDato(${m.id}, 'fecha2', this.value)" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda">
-                            <input type="time" step="1800" value="${m.hora2 || ''}" onchange="actualizarDato(${m.id}, 'hora2', this.value)" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda">
+                            ${getHourSelectHTML(m.hora2, `actualizarDato(${m.id}, \'hora2\', this.value)`)}
                             <input type="text" list="docentes-datalist" value="${getDocenteDisplay(m.rfc2)}" placeholder="Profesor / RFC 2" onchange="actualizarDocente(${m.id}, 'rfc2', this.value)" class="flex-1 text-[11px] border border-slate-300 rounded p-1 uppercase focus:ring-1 focus:ring-ipn-guinda font-mono">
                         </div>
                     </td>
