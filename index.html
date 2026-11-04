@@ -459,6 +459,50 @@
 
             <!-- SCRIPT LOGIC -->
     <script>
+        
+        function checkSession() {
+            if (localStorage.getItem('ets_session_user')) {
+                const user = localStorage.getItem('ets_session_user');
+                const role = localStorage.getItem('ets_session_role');
+                currentUser = { user: user, role: role, carrera: role && role.includes('Jefatura') ? role.replace('Jefatura ', '').toUpperCase() : 'TODAS' };
+                const overlay = document.getElementById('login-overlay');
+                if (overlay) overlay.classList.add('hidden');
+                const badge = document.getElementById('current-user-badge');
+                if (badge) badge.innerText = currentUser.role;
+                // DO NOT CALL initApp here if it causes a loop or if it's already called.
+                // Wait, doLogin calls initApp(). checkSession is called in initApp().
+                // Let's just keep it simple.
+            }
+        }
+
+        function renderDatalistDocentes() {
+            if (typeof poblarDatalistDocentes === 'function') {
+                poblarDatalistDocentes();
+            } else {
+                const dl = document.getElementById('docentes-datalist');
+                if (dl && typeof stateDocentes !== 'undefined') {
+                    dl.innerHTML = '';
+                    stateDocentes.forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d.nombre + " (" + d.rfc + ")";
+                        dl.appendChild(opt);
+                    });
+                }
+            }
+        }
+
+        function getHourSelectHTML(currentVal, onChangeCall) {
+            let opts = '<option value="">-- Hora --</option>';
+            for (let h = 7; h <= 22; h++) {
+                ['00', '30'].forEach(m => {
+                    let t = String(h).padStart(2, '0') + ':' + m;
+                    let sel = (currentVal === t) ? 'selected' : '';
+                    opts += `<option value="${t}" ${sel}>${t}</option>`;
+                });
+            }
+            return `<select onchange="${onChangeCall}" class="text-[11px] border border-slate-300 rounded p-1 focus:ring-1 focus:ring-ipn-guinda bg-white font-mono font-bold">${opts}</select>`;
+        }
+
         let stateMaterias = [];
         let stateDocentes = [];
         let currentUser = null;
