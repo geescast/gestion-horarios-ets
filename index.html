@@ -124,6 +124,10 @@
                     <i class="fa-solid fa-file-pdf"></i>
                     <span>Listados PDF Inscritos</span>
                 </button>
+                <button onclick="openAuditoriaModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3 py-2 rounded shadow transition flex items-center gap-1.5" title="Ver historial de cambios y auditoría">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Historial de Cambios</span>
+                </button>
             </div>
         </div>
     </header>
@@ -857,6 +861,10 @@ function doLogin() {
         function actualizarDato(id, campo, val) {
             const mat = stateMaterias.find(x => x.id === id);
             if (mat) {
+                const valAnterior = mat[campo];
+                if (valAnterior !== val) {
+                    registrarCambio(id, campo, valAnterior, val);
+                }
                 mat[campo] = val;
                 const sync = document.getElementById('sync-espejo-checkbox').checked;
                 if (sync && mat.jefatura === "FORMACIÓN BÁSICA" && (campo === 'fecha' || campo === 'hora' || campo === 'rfc')) {
@@ -1329,6 +1337,54 @@ function doLogin() {
             closeInscritosModal();
         }
 
+    
+    <!-- Modal: Historial de Cambios / Auditoría -->
+    <div id="modal-auditoria" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div class="bg-slate-900 text-white p-4 flex justify-between items-center border-b border-slate-800">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-ipn-dorado text-lg"></i>
+                    <div>
+                        <h3 class="font-bold text-base leading-none">Auditoría e Historial de Modificaciones de Usuarios</h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Registro en tiempo real de cambios en fechas, horas y asignación docente.</p>
+                    </div>
+                </div>
+                <button onclick="closeAuditoriaModal()" class="text-slate-400 hover:text-white text-lg p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-3 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
+                <span class="text-xs font-semibold text-slate-700">Total de eventos registrados: <span id="audit-count" class="font-bold">0</span></span>
+                <button onclick="limpiarAuditoria()" class="text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded transition shadow-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash"></i>
+                    <span>Vaciar Historial</span>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-2 custom-scroll max-h-[500px]">
+                <table class="w-full text-xs text-left border-collapse">
+                    <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0 uppercase text-[10px]">
+                        <tr>
+                            <th class="p-2.5 border-b">Fecha y Hora</th>
+                            <th class="p-2.5 border-b">Usuario</th>
+                            <th class="p-2.5 border-b">Materia</th>
+                            <th class="p-2.5 border-b">Campo Modificado</th>
+                            <th class="p-2.5 border-b">Valor Anterior</th>
+                            <th class="p-2.5 border-b">Nuevo Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditoria-tbody" class="divide-y divide-slate-100">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="p-3 bg-slate-100 border-t border-slate-200 flex justify-end">
+                <button onclick="closeAuditoriaModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-4 py-2 rounded font-bold transition">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     </body>
 </html>
 
@@ -1494,6 +1550,54 @@ function doLogin() {
             alert("¡PDF generado y descargado con éxito (" + keys.length + " listados creados)!");
             closeInscritosModal();
         }
+
+    
+    <!-- Modal: Historial de Cambios / Auditoría -->
+    <div id="modal-auditoria" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div class="bg-slate-900 text-white p-4 flex justify-between items-center border-b border-slate-800">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-ipn-dorado text-lg"></i>
+                    <div>
+                        <h3 class="font-bold text-base leading-none">Auditoría e Historial de Modificaciones de Usuarios</h3>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Registro en tiempo real de cambios en fechas, horas y asignación docente.</p>
+                    </div>
+                </div>
+                <button onclick="closeAuditoriaModal()" class="text-slate-400 hover:text-white text-lg p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-3 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
+                <span class="text-xs font-semibold text-slate-700">Total de eventos registrados: <span id="audit-count" class="font-bold">0</span></span>
+                <button onclick="limpiarAuditoria()" class="text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded transition shadow-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash"></i>
+                    <span>Vaciar Historial</span>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-2 custom-scroll max-h-[500px]">
+                <table class="w-full text-xs text-left border-collapse">
+                    <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0 uppercase text-[10px]">
+                        <tr>
+                            <th class="p-2.5 border-b">Fecha y Hora</th>
+                            <th class="p-2.5 border-b">Usuario</th>
+                            <th class="p-2.5 border-b">Materia</th>
+                            <th class="p-2.5 border-b">Campo Modificado</th>
+                            <th class="p-2.5 border-b">Valor Anterior</th>
+                            <th class="p-2.5 border-b">Nuevo Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditoria-tbody" class="divide-y divide-slate-100">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="p-3 bg-slate-100 border-t border-slate-200 flex justify-end">
+                <button onclick="closeAuditoriaModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-4 py-2 rounded font-bold transition">Cerrar</button>
+            </div>
+        </div>
+    </div>
 
     </body>
 </html>
