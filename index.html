@@ -1176,10 +1176,6 @@ function doLogin() {
 
         
     <script>
-        
-
-        
-<script>
         let inscritosRows = [];
 
         function openInscritosModal() {
@@ -1396,5 +1392,77 @@ function doLogin() {
         </div>
     </div>
 
-    </body>
+    
+    <script>
+        // Sistema de Auditoría e Historial de Cambios
+        let stateAuditoria = JSON.parse(localStorage.getItem('ets_auditoria')) || [];
+
+        function registrarCambio(materiaId, campo, valorAnterior, valorNuevo) {
+            const user = currentUser ? currentUser.user : 'Desconocido';
+            const role = currentUser ? currentUser.role : 'Sistema';
+            const mat = stateMaterias.find(x => x.id === materiaId);
+            const desc = mat ? (mat.clave + " - " + mat.descripcion) : ("ID: " + materiaId);
+
+            const record = {
+                fechaHora: new Date().toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'medium' }),
+                usuario: user,
+                rol: role,
+                materia: desc,
+                campo: campo,
+                anterior: valorAnterior || 'Vacío',
+                nuevo: valorNuevo || 'Vacío'
+            };
+
+            stateAuditoria.unshift(record);
+            if (stateAuditoria.length > 200) stateAuditoria.pop();
+            localStorage.setItem('ets_auditoria', JSON.stringify(stateAuditoria));
+        }
+
+        function openAuditoriaModal() {
+            renderAuditoriaTable();
+            document.getElementById('modal-auditoria').classList.remove('hidden');
+        }
+
+        function closeAuditoriaModal() {
+            document.getElementById('modal-auditoria').classList.add('hidden');
+        }
+
+        function renderAuditoriaTable() {
+            const tbody = document.getElementById('auditoria-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            
+            const countSpan = document.getElementById('audit-count');
+            if (countSpan) countSpan.innerText = stateAuditoria.length;
+
+            if (stateAuditoria.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">No hay registros de cambios aún.</td></tr>`;
+                return;
+            }
+
+            stateAuditoria.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition text-[11px]";
+                tr.innerHTML = `
+                    <td class="p-2 border-b font-mono whitespace-nowrap">${item.fechaHora}</td>
+                    <td class="p-2 border-b font-bold text-ipn-guinda">${item.usuario} <span class="text-[10px] text-slate-500 font-normal">(${item.rol})</span></td>
+                    <td class="p-2 border-b font-semibold text-slate-800">${item.materia}</td>
+                    <td class="p-2 border-b font-mono uppercase text-slate-600">${item.campo}</td>
+                    <td class="p-2 border-b text-rose-700 font-medium">${item.anterior}</td>
+                    <td class="p-2 border-b text-emerald-700 font-medium">${item.nuevo}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function limpiarAuditoria() {
+            if (confirm("¿Está seguro de vaciar el historial de cambios?")) {
+                stateAuditoria = [];
+                localStorage.removeItem('ets_auditoria');
+                renderAuditoriaTable();
+            }
+        }
+    </script>
+
+</body>
 </html>
