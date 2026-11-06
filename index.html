@@ -42,6 +42,9 @@
             background: #94a3b8;
         }
     </style>
+    <!-- jsPDF & AutoTable CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/plugin.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
 
@@ -116,6 +119,10 @@
                 <button onclick="exportarExcelSAES()" class="bg-ipn-dorado hover:bg-[#b08b47] text-slate-900 text-xs font-bold px-4 py-2 rounded shadow transition flex items-center gap-1.5">
                     <i class="fa-solid fa-download"></i>
                     <span>Exportar Excel SAES</span>
+                </button>
+                <button id="btn-inscritos-pdf" onclick="openInscritosModal()" class="hidden bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold px-3 py-2 rounded shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span>Listados PDF Inscritos</span>
                 </button>
             </div>
         </div>
@@ -450,6 +457,50 @@
     <datalist id="docentes-datalist">
     </datalist>
 
+    
+    <!-- Modal: Generación de Listados PDF de Inscritos -->
+    <div id="modal-inscritos" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div class="bg-slate-900 text-white p-4 flex justify-between items-center border-b border-slate-800">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-file-pdf text-ipn-dorado text-lg"></i>
+                    <div>
+                        <h3 class="font-bold text-base leading-none">Generador de Listados de Asistencia (Formato PDF Institucional)</h3>
+                    </div>
+                </div>
+                <button onclick="closeInscritosModal()" class="text-slate-400 hover:text-white text-lg p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-6 flex flex-col gap-4">
+                <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-xs text-blue-900 flex items-start gap-2.5">
+                    <i class="fa-solid fa-circle-info text-blue-600 mt-0.5 text-sm"></i>
+                    <div>
+                        <span class="font-bold">Instrucciones:</span> Cargue el archivo de Excel con los alumnos inscritos a los ETS. El sistema procesará automáticamente los grupos y generará los listados oficiales con el formato exacto de asistencia del IPN (ESCA Santo Tomás).
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Cargar Excel de Inscritos a ETS (.xlsx):</label>
+                    <input type="file" id="excel-inscritos-input" accept=".xlsx, .xls" class="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-slate-50 font-medium cursor-pointer">
+                </div>
+
+                <div id="inscritos-status" class="hidden text-xs font-semibold p-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-center">
+                    ¡Archivo cargado con éxito! <span id="inscritos-count" class="font-bold"></span> registros detectados.
+                </div>
+            </div>
+
+            <div class="p-3 bg-slate-100 border-t border-slate-200 flex justify-end gap-2">
+                <button onclick="closeInscritosModal()" class="text-xs bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold px-4 py-2 rounded transition">Cerrar</button>
+                <button onclick="generarListadosPDF()" id="btn-generar-pdf" disabled class="text-xs bg-indigo-700 hover:bg-indigo-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-5 py-2 rounded transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Generar y Descargar PDF Completo</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <footer class="bg-white border-t border-slate-200 py-3 text-center text-[11px] text-slate-500">
         Gestión Escolar - Instituto Politécnico Nacional | Plantilla Oficial de Exámenes a Título de Suficiencia (ETS)
     </footer>
@@ -461,14 +512,28 @@
             if (localStorage.getItem('ets_session_user')) {
                 const user = localStorage.getItem('ets_session_user');
                 const role = localStorage.getItem('ets_session_role');
-                currentUser = { user: user, role: role, carrera: role && role.includes('Jefatura') ? role.replace('Jefatura ', '').toUpperCase() : 'TODAS' };
+                // Let's deduce carrera properly for FBDI / jefatura_fbdi / etc.
+                let carrera = 'TODAS';
+                if (role && role.includes('Jefatura')) {
+                    carrera = role.replace('Jefatura ', '').toUpperCase();
+                }
+                if (user === 'FBDI' || user === 'jefatura_fbdi') {
+                    carrera = 'FORMACIÓN BÁSICA';
+                }
+                currentUser = { user: user, role: role, carrera: carrera };
                 const overlay = document.getElementById('login-overlay');
                 if (overlay) overlay.classList.add('hidden');
                 const badge = document.getElementById('current-user-badge');
                 if (badge) badge.innerText = currentUser.role;
-                // DO NOT CALL initApp here if it causes a loop or if it's already called.
-                // Wait, doLogin calls initApp(). checkSession is called in initApp().
-                // Let's just keep it simple.
+
+                const btnPdf = document.getElementById('btn-inscritos-pdf');
+                if (btnPdf) {
+                    if (currentUser.user === 'admin') {
+                        btnPdf.classList.remove('hidden');
+                    } else {
+                        btnPdf.classList.add('hidden');
+                    }
+                }
             }
         }
 
@@ -516,6 +581,7 @@
             {user: "jefatura_nd", pass: "nd202026", role: "Jefatura Negocios Digitales", carrera: "LICENCIATURA EN NEGOCIOS DIGITALES"},
             {user: "jefatura_md", pass: "md212026", role: "Jefatura Mercadotecnia Digital", carrera: "LICENCIATURA EN MERCADOTECNIA DIGITAL"},
             {user: "FBDI", pass: "fbdi2026", role: "Jefatura Formación Básica", carrera: "FORMACIÓN BÁSICA"},
+            {user: "jefatura_fbdi", pass: "fbdi2026", role: "Jefatura Formación Básica", carrera: "FORMACIÓN BÁSICA"},
             {user: "SSEIS", pass: "sseis2026", role: "SSEIS Global", carrera: "TODAS"},
             {user: "SUB_ACA", pass: "subaca2026", role: "Subdirección Académica", carrera: "TODAS"},
             {user: "JDGE", pass: "jdge2026", role: "Gestión Escolar", carrera: "TODAS"}
@@ -534,6 +600,16 @@ function doLogin() {
                 currentUser = found;
                 document.getElementById('login-overlay').classList.add('hidden');
                 document.getElementById('current-user-badge').innerText = currentUser.role;
+                
+                const btnPdf = document.getElementById('btn-inscritos-pdf');
+                if (btnPdf) {
+                    if (currentUser.user === 'admin') {
+                        btnPdf.classList.remove('hidden');
+                    } else {
+                        btnPdf.classList.add('hidden');
+                    }
+                }
+
                 err.classList.add('hidden');
                 initApp();
             } else {
@@ -1089,8 +1165,336 @@ function doLogin() {
             checkSession();
         });
     </script>
-</body>
+
+        let inscritosRows = [];
+
+        function openInscritosModal() {
+            document.getElementById('modal-inscritos').classList.remove('hidden');
+        }
+
+        function closeInscritosModal() {
+            document.getElementById('modal-inscritos').classList.add('hidden');
+        }
+
+        document.getElementById('excel-inscritos-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    inscritosRows = XLSX.utils.sheet_to_json(firstSheet);
+                    
+                    const statusDiv = document.getElementById('inscritos-status');
+                    document.getElementById('inscritos-count').innerText = inscritosRows.length;
+                    statusDiv.classList.remove('hidden');
+                    document.getElementById('btn-generar-pdf').removeAttribute('disabled');
+                } catch(err) {
+                    alert("Error al leer el archivo de inscritos: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function generarListadosPDF() {
+            if (inscritosRows.length === 0) {
+                alert("No hay registros cargados.");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('portrait', 'mm', 'letter');
+
+            // Agrupar por materia, fecha, hora, programa, plan, especialidad, turno, profesor
+            const gruposMap = {};
+            inscritosRows.forEach(r => {
+                const prog = String(r['Programa académico'] || 'NO ESPECIFICADA');
+                const plan = String(r['Plan_Estud'] || '0');
+                const cveUda = String(r['Cve de UdA'] || '');
+                const uda = String(r['Unidad de aprendizaje'] || '');
+                const fecha = String(r['Fecha'] || '');
+                const hora = String(r['Hora'] || '');
+                const prof = String(r['Profesor'] || 'SIN ASIGNAR');
+                const turno = String(r['TURNO'] || 'MATUTINO');
+                const esp = String(r['ESPECIALIDAD'] || 'SIN ESPECIALIDAD');
+
+                const key = `${prog}|${plan}|${cveUda}|${uda}|${fecha}|${hora}|${prof}|${turno}|${esp}`;
+                if (!gruposMap[key]) {
+                    gruposMap[key] = [];
+                }
+                gruposMap[key].push(r);
+            });
+
+            const keys = Object.keys(gruposMap);
+            keys.forEach((key, index) => {
+                if (index > 0) {
+                    doc.addPage();
+                }
+
+                const listado = gruposMap[key];
+                const [prog, plan, cveUda, uda, fecha, hora, prof, turno, esp] = key.split('|');
+
+                // Encabezado institucional
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+                doc.setTextColor(107, 29, 47); // IPN Guinda
+                doc.text("INSTITUTO POLITÉCNICO NACIONAL", 108, 12, { align: "center" });
+                doc.text("ESCUELA SUPERIOR DE COMERCIO Y ADMINISTRACIÓN", 108, 16, { align: "center" });
+                doc.text("UNIDAD SANTO TOMÁS", 108, 20, { align: "center" });
+
+                doc.setFontSize(8);
+                doc.setTextColor(0, 0, 0);
+                doc.text("LISTA DE ASISTENCIA DEL ETS ORDINARIO CORRESPONDIENTE AL PERIODO JUL2026", 108, 25, { align: "center" });
+
+                // Metadatos
+                doc.setFontSize(7.5);
+                let y = 32;
+                const col1X = 14;
+                const col2X = 110;
+
+                doc.text(`LICENCIATURA: ${prog}`, col1X, y);
+                doc.text(`FECHA DEL EXAMEN: ${fecha} ${hora}`, col2X, y);
+                y += 5;
+
+                doc.text(`PLAN DE ESTUDIOS: ${plan}`, col1X, y);
+                doc.text(`ASIGNATURA: ${cveUda}, ${uda}`, col2X, y);
+                y += 5;
+
+                doc.text(`ESPECIALIDAD: ${esp}`, col1X, y);
+                doc.text(`PROFESOR: ${prof}`, col2X, y);
+                y += 5;
+
+                doc.text(`ACADEMIA: NO ESPECIFICADA`, col1X, y);
+                doc.text(`TURNO: ${turno}`, col2X, y);
+                y += 5;
+
+                doc.text(`INSCRITOS AL ETS: ${listado.length}`, col1X, y);
+                doc.text(`NUMERO DE LISTADO: 1`, col2X, y);
+                y += 8;
+
+                // Tabla de alumnos
+                const tableBody = listado.map((alu, i) => {
+                    const boleta = String(alu['BOLETA'] || '').replace('.0', '');
+                    const appPat = String(alu['APELLIDO PATERNO'] || '');
+                    const appMat = String(alu['APELLIDO MATERNO'] || '');
+                    const nombre = String(alu['NOMBRE(S)'] || '');
+                    const nombreCompleto = `${appPat} ${appMat} ${nombre}`.trim();
+
+                    return [
+                        String(i + 1),
+                        boleta,
+                        nombreCompleto,
+                        ""
+                    ];
+                });
+
+                doc.autoTable({
+                    startY: y,
+                    head: [['NO.', 'BOLETA', 'NOMBRE', 'ASISTENCIA']],
+                    body: tableBody,
+                    theme: 'grid',
+                    headStyles: {
+                        fillColor: [107, 29, 47],
+                        textColor: [255, 255, 255],
+                        fontStyle: 'bold',
+                        halign: 'center',
+                        fontSize: 8
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 15, halign: 'center' },
+                        1: { cellWidth: 35, halign: 'center' },
+                        2: { cellWidth: 110, halign: 'left' },
+                        3: { cellWidth: 30, halign: 'center' }
+                    },
+                    styles: {
+                        fontSize: 8,
+                        cellPadding: 2,
+                        textColor: [0, 0, 0]
+                    },
+                    didDrawPage: function (data) {
+                        // Footer en cada página del documento
+                        doc.setFont("helvetica", "normal");
+                        doc.setFontSize(6.5);
+                        doc.text("FECHA DE IMPRESIÓN: jueves, 05 de mayo, 2026", 14, 274);
+                        doc.text("DAE_v1", 14, 277);
+                        doc.text("NOTA: ESTE DOCUMENTO CARECE DE VALIDEZ SIN FIRMA NI SELLO OFICIAL Y EN CASO DE TENER RASPADURAS O ENMENDADURAS", 14, 280);
+                    }
+                });
+            });
+
+            doc.save("Listados_Inscritos_ETS.pdf");
+            alert("¡PDF generado y descargado con éxito (" + keys.length + " listados creados)!");
+            closeInscritosModal();
+        }
+
+    </body>
 </html>
-</body>
+
+        let inscritosRows = [];
+
+        function openInscritosModal() {
+            document.getElementById('modal-inscritos').classList.remove('hidden');
+        }
+
+        function closeInscritosModal() {
+            document.getElementById('modal-inscritos').classList.add('hidden');
+        }
+
+        document.getElementById('excel-inscritos-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    inscritosRows = XLSX.utils.sheet_to_json(firstSheet);
+                    
+                    const statusDiv = document.getElementById('inscritos-status');
+                    document.getElementById('inscritos-count').innerText = inscritosRows.length;
+                    statusDiv.classList.remove('hidden');
+                    document.getElementById('btn-generar-pdf').removeAttribute('disabled');
+                } catch(err) {
+                    alert("Error al leer el archivo de inscritos: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function generarListadosPDF() {
+            if (inscritosRows.length === 0) {
+                alert("No hay registros cargados.");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('portrait', 'mm', 'letter');
+
+            // Agrupar por materia, fecha, hora, programa, plan, especialidad, turno, profesor
+            const gruposMap = {};
+            inscritosRows.forEach(r => {
+                const prog = String(r['Programa académico'] || 'NO ESPECIFICADA');
+                const plan = String(r['Plan_Estud'] || '0');
+                const cveUda = String(r['Cve de UdA'] || '');
+                const uda = String(r['Unidad de aprendizaje'] || '');
+                const fecha = String(r['Fecha'] || '');
+                const hora = String(r['Hora'] || '');
+                const prof = String(r['Profesor'] || 'SIN ASIGNAR');
+                const turno = String(r['TURNO'] || 'MATUTINO');
+                const esp = String(r['ESPECIALIDAD'] || 'SIN ESPECIALIDAD');
+
+                const key = `${prog}|${plan}|${cveUda}|${uda}|${fecha}|${hora}|${prof}|${turno}|${esp}`;
+                if (!gruposMap[key]) {
+                    gruposMap[key] = [];
+                }
+                gruposMap[key].push(r);
+            });
+
+            const keys = Object.keys(gruposMap);
+            keys.forEach((key, index) => {
+                if (index > 0) {
+                    doc.addPage();
+                }
+
+                const listado = gruposMap[key];
+                const [prog, plan, cveUda, uda, fecha, hora, prof, turno, esp] = key.split('|');
+
+                // Encabezado institucional
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+                doc.setTextColor(107, 29, 47); // IPN Guinda
+                doc.text("INSTITUTO POLITÉCNICO NACIONAL", 108, 12, { align: "center" });
+                doc.text("ESCUELA SUPERIOR DE COMERCIO Y ADMINISTRACIÓN", 108, 16, { align: "center" });
+                doc.text("UNIDAD SANTO TOMÁS", 108, 20, { align: "center" });
+
+                doc.setFontSize(8);
+                doc.setTextColor(0, 0, 0);
+                doc.text("LISTA DE ASISTENCIA DEL ETS ORDINARIO CORRESPONDIENTE AL PERIODO JUL2026", 108, 25, { align: "center" });
+
+                // Metadatos
+                doc.setFontSize(7.5);
+                let y = 32;
+                const col1X = 14;
+                const col2X = 110;
+
+                doc.text(`LICENCIATURA: ${prog}`, col1X, y);
+                doc.text(`FECHA DEL EXAMEN: ${fecha} ${hora}`, col2X, y);
+                y += 5;
+
+                doc.text(`PLAN DE ESTUDIOS: ${plan}`, col1X, y);
+                doc.text(`ASIGNATURA: ${cveUda}, ${uda}`, col2X, y);
+                y += 5;
+
+                doc.text(`ESPECIALIDAD: ${esp}`, col1X, y);
+                doc.text(`PROFESOR: ${prof}`, col2X, y);
+                y += 5;
+
+                doc.text(`ACADEMIA: NO ESPECIFICADA`, col1X, y);
+                doc.text(`TURNO: ${turno}`, col2X, y);
+                y += 5;
+
+                doc.text(`INSCRITOS AL ETS: ${listado.length}`, col1X, y);
+                doc.text(`NUMERO DE LISTADO: 1`, col2X, y);
+                y += 8;
+
+                // Tabla de alumnos
+                const tableBody = listado.map((alu, i) => {
+                    const boleta = String(alu['BOLETA'] || '').replace('.0', '');
+                    const appPat = String(alu['APELLIDO PATERNO'] || '');
+                    const appMat = String(alu['APELLIDO MATERNO'] || '');
+                    const nombre = String(alu['NOMBRE(S)'] || '');
+                    const nombreCompleto = `${appPat} ${appMat} ${nombre}`.trim();
+
+                    return [
+                        String(i + 1),
+                        boleta,
+                        nombreCompleto,
+                        ""
+                    ];
+                });
+
+                doc.autoTable({
+                    startY: y,
+                    head: [['NO.', 'BOLETA', 'NOMBRE', 'ASISTENCIA']],
+                    body: tableBody,
+                    theme: 'grid',
+                    headStyles: {
+                        fillColor: [107, 29, 47],
+                        textColor: [255, 255, 255],
+                        fontStyle: 'bold',
+                        halign: 'center',
+                        fontSize: 8
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 15, halign: 'center' },
+                        1: { cellWidth: 35, halign: 'center' },
+                        2: { cellWidth: 110, halign: 'left' },
+                        3: { cellWidth: 30, halign: 'center' }
+                    },
+                    styles: {
+                        fontSize: 8,
+                        cellPadding: 2,
+                        textColor: [0, 0, 0]
+                    },
+                    didDrawPage: function (data) {
+                        // Footer en cada página del documento
+                        doc.setFont("helvetica", "normal");
+                        doc.setFontSize(6.5);
+                        doc.text("FECHA DE IMPRESIÓN: jueves, 05 de mayo, 2026", 14, 274);
+                        doc.text("DAE_v1", 14, 277);
+                        doc.text("NOTA: ESTE DOCUMENTO CARECE DE VALIDEZ SIN FIRMA NI SELLO OFICIAL Y EN CASO DE TENER RASPADURAS O ENMENDADURAS", 14, 280);
+                    }
+                });
+            });
+
+            doc.save("Listados_Inscritos_ETS.pdf");
+            alert("¡PDF generado y descargado con éxito (" + keys.length + " listados creados)!");
+            closeInscritosModal();
+        }
+
+    </body>
 </html>
 
