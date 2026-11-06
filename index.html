@@ -485,9 +485,15 @@
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Cargar Excel de Inscritos a ETS (.xlsx):</label>
-                    <input type="file" id="excel-inscritos-input" accept=".xlsx, .xls" class="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-slate-50 font-medium cursor-pointer">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Periodo ETS:</label>
+                        <input type="text" id="input-periodo-pdf" value="JUL2026" class="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-white font-medium focus:outline-none focus:ring-2 focus:ring-indigo-700" placeholder="Ej. JUL2026, ENE2027">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Cargar Excel de Inscritos a ETS (.xlsx):</label>
+                        <input type="file" id="excel-inscritos-input" accept=".xlsx, .xls" class="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-slate-50 font-medium cursor-pointer">
+                    </div>
                 </div>
 
                 <div id="inscritos-status" class="hidden text-xs font-semibold p-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-center">
@@ -1217,12 +1223,15 @@ function doLogin() {
                 alert("No hay registros cargados.");
                 return;
             }
+            
+            const periodoStr = document.getElementById('input-periodo-pdf').value.trim() || 'JUL2026';
 
             try {
                 const { jsPDF } = window.jspdf;
-                const doc = new jsPDF('portrait', 'mm', 'letter');
 
-                const gruposMap = {};
+                // Agrupamos primero por carrera (programa) y luego por materia/grupo
+                const carrerasMap = {};
+
                 inscritosRows.forEach(r => {
                     const prog = String(r['Programa académico'] || 'NO ESPECIFICADA');
                     const plan = String(r['Plan_Estud'] || '0');
@@ -1234,108 +1243,128 @@ function doLogin() {
                     const turno = String(r['TURNO'] || 'MATUTINO');
                     const esp = String(r['ESPECIALIDAD'] || 'SIN ESPECIALIDAD');
 
-                    const key = `${prog}|${plan}|${cveUda}|${uda}|${fecha}|${hora}|${prof}|${turno}|${esp}`;
-                    if (!gruposMap[key]) {
-                        gruposMap[key] = [];
+                    const groupKey = `${prog}|${plan}|${cveUda}|${uda}|${fecha}|${hora}|${prof}|${turno}|${esp}`;
+                    
+                    if (!carrerasMap[prog]) {
+                        carrerasMap[prog] = {};
                     }
-                    gruposMap[key].push(r);
+                    if (!carrerasMap[prog][groupKey]) {
+                        carrerasMap[prog][groupKey] = [];
+                    }
+                    carrerasMap[prog][groupKey].push(r);
                 });
+                
+                // Fecha de impresion actual
+                const opcionesFecha = { weekday: 'long', year: 'numeric', month: 'long', day: '2-digit' };
+                const strFechaImpresion = new Date().toLocaleDateString('es-MX', opcionesFecha);
 
-                const keys = Object.keys(gruposMap);
-                keys.forEach((key, index) => {
-                    if (index > 0) {
-                        doc.addPage();
-                    }
-
-                    const listado = gruposMap[key];
-                    const [prog, plan, cveUda, uda, fecha, hora, prof, turno, esp] = key.split('|');
-
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(9);
-                    doc.setTextColor(107, 29, 47);
-                    doc.text("INSTITUTO POLITÉCNICO NACIONAL", 108, 12, { align: "center" });
-                    doc.text("ESCUELA SUPERIOR DE COMERCIO Y ADMINISTRACIÓN", 108, 16, { align: "center" });
-                    doc.text("UNIDAD SANTO TOMÁS", 108, 20, { align: "center" });
-
-                    doc.setFontSize(8);
-                    doc.setTextColor(0, 0, 0);
-                    doc.text("LISTA DE ASISTENCIA DEL ETS ORDINARIO CORRESPONDIENTE AL PERIODO JUL2026", 108, 25, { align: "center" });
-
-                    doc.setFontSize(7.5);
-                    let y = 32;
-                    const col1X = 14;
-                    const col2X = 110;
-
-                    doc.text(`LICENCIATURA: ${prog}`, col1X, y);
-                    doc.text(`FECHA DEL EXAMEN: ${fecha} ${hora}`, col2X, y);
-                    y += 5;
-
-                    doc.text(`PLAN DE ESTUDIOS: ${plan}`, col1X, y);
-                    doc.text(`ASIGNATURA: ${cveUda}, ${uda}`, col2X, y);
-                    y += 5;
-
-                    doc.text(`ESPECIALIDAD: ${esp}`, col1X, y);
-                    doc.text(`PROFESOR: ${prof}`, col2X, y);
-                    y += 5;
-
-                    doc.text(`ACADEMIA: NO ESPECIFICADA`, col1X, y);
-                    doc.text(`TURNO: ${turno}`, col2X, y);
-                    y += 5;
-
-                    doc.text(`INSCRITOS AL ETS: ${listado.length}`, col1X, y);
-                    doc.text(`NUMERO DE LISTADO: 1`, col2X, y);
-                    y += 8;
-
-                    const tableBody = listado.map((alu, i) => {
-                        const boleta = String(alu['BOLETA'] || '').replace('.0', '');
-                        const appPat = String(alu['APELLIDO PATERNO'] || '');
-                        const appMat = String(alu['APELLIDO MATERNO'] || '');
-                        const nombre = String(alu['NOMBRE(S)'] || '');
-                        const nombreCompleto = `${appPat} ${appMat} ${nombre}`.trim();
-
-                        return [
-                            String(i + 1),
-                            boleta,
-                            nombreCompleto,
-                            ""
-                        ];
-                    });
-
-                    doc.autoTable({
-                        startY: y,
-                        head: [['NO.', 'BOLETA', 'NOMBRE', 'ASISTENCIA']],
-                        body: tableBody,
-                        theme: 'grid',
-                        headStyles: {
-                            fillColor: [107, 29, 47],
-                            textColor: [255, 255, 255],
-                            fontStyle: 'bold',
-                            halign: 'center',
-                            fontSize: 8
-                        },
-                        columnStyles: {
-                            0: { cellWidth: 15, halign: 'center' },
-                            1: { cellWidth: 35, halign: 'center' },
-                            2: { cellWidth: 110, halign: 'left' },
-                            3: { cellWidth: 30, halign: 'center' }
-                        },
-                        styles: {
-                            fontSize: 8,
-                            cellPadding: 2,
-                            textColor: [0, 0, 0]
-                        },
-                        didDrawPage: function (data) {
-                            doc.setFont("helvetica", "normal");
-                            doc.setFontSize(6.5);
-                            doc.text("FECHA DE IMPRESIÓN: jueves, 05 de mayo, 2026", 14, 274);
-                            doc.text("DAE_v1", 14, 277);
-                            doc.text("NOTA: ESTE DOCUMENTO CARECE DE VALIDEZ SIN FIRMA NI SELLO OFICIAL Y EN CASO DE TENER RASPADURAS O ENMENDADURAS", 14, 280);
+                const programasKeys = Object.keys(carrerasMap);
+                
+                // Iteramos por cada carrera y generamos un PDF
+                programasKeys.forEach(carrera => {
+                    const doc = new jsPDF('portrait', 'mm', 'letter');
+                    const gruposMap = carrerasMap[carrera];
+                    const keys = Object.keys(gruposMap);
+                    
+                    keys.forEach((key, index) => {
+                        if (index > 0) {
+                            doc.addPage();
                         }
+
+                        const listado = gruposMap[key];
+                        const [prog, plan, cveUda, uda, fecha, hora, prof, turno, esp] = key.split('|');
+
+                        doc.setFont("helvetica", "bold");
+                        doc.setFontSize(9);
+                        doc.setTextColor(107, 29, 47); // Guinda
+                        doc.text("INSTITUTO POLITÉCNICO NACIONAL", 108, 12, { align: "center" });
+                        doc.text("ESCUELA SUPERIOR DE COMERCIO Y ADMINISTRACIÓN", 108, 16, { align: "center" });
+                        doc.text("UNIDAD SANTO TOMÁS", 108, 20, { align: "center" });
+
+                        doc.setFontSize(8);
+                        doc.setTextColor(0, 0, 0);
+                        doc.text(`LISTA DE ASISTENCIA DEL ETS ORDINARIO CORRESPONDIENTE AL PERIODO ${periodoStr.toUpperCase()}`, 108, 25, { align: "center" });
+
+                        doc.setFontSize(7.5);
+                        let y = 32;
+                        const col1X = 14;
+                        const col2X = 110;
+
+                        doc.text(`LICENCIATURA: ${prog}`, col1X, y);
+                        doc.text(`FECHA DEL EXAMEN: ${fecha} ${hora}`, col2X, y);
+                        y += 5;
+
+                        doc.text(`PLAN DE ESTUDIOS: ${plan}`, col1X, y);
+                        doc.text(`ASIGNATURA: ${cveUda}, ${uda}`, col2X, y);
+                        y += 5;
+
+                        doc.text(`ESPECIALIDAD: ${esp}`, col1X, y);
+                        doc.text(`PROFESOR: ${prof}`, col2X, y);
+                        y += 5;
+
+                        doc.text(`ACADEMIA: NO ESPECIFICADA`, col1X, y);
+                        doc.text(`TURNO: ${turno}`, col2X, y);
+                        y += 5;
+
+                        doc.text(`INSCRITOS AL ETS: ${listado.length}`, col1X, y);
+                        doc.text(`NUMERO DE LISTADO: 1`, col2X, y);
+                        y += 8;
+
+                        const tableBody = listado.map((alu, i) => {
+                            const boleta = String(alu['BOLETA'] || '').replace('.0', '');
+                            const appPat = String(alu['APELLIDO PATERNO'] || '');
+                            const appMat = String(alu['APELLIDO MATERNO'] || '');
+                            const nombre = String(alu['NOMBRE(S)'] || '');
+                            const nombreCompleto = `${appPat} ${appMat} ${nombre}`.trim();
+
+                            return [
+                                String(i + 1),
+                                boleta,
+                                nombreCompleto,
+                                ""
+                            ];
+                        });
+
+                        doc.autoTable({
+                            startY: y,
+                            head: [['NO.', 'BOLETA', 'NOMBRE', 'ASISTENCIA']],
+                            body: tableBody,
+                            theme: 'grid',
+                            headStyles: {
+                                fillColor: [107, 29, 47],
+                                textColor: [255, 255, 255],
+                                fontStyle: 'bold',
+                                halign: 'center',
+                                fontSize: 8
+                            },
+                            columnStyles: {
+                                0: { cellWidth: 15, halign: 'center' },
+                                1: { cellWidth: 35, halign: 'center' },
+                                2: { cellWidth: 110, halign: 'left' },
+                                3: { cellWidth: 30, halign: 'center' }
+                            },
+                            styles: {
+                                fontSize: 8,
+                                cellPadding: 2,
+                                textColor: [0, 0, 0]
+                            },
+                            didDrawPage: function (data) {
+                                // Subimos el pie de página 10 unidades (de 274 a 264, etc.)
+                                doc.setFont("helvetica", "normal");
+                                doc.setFontSize(6.5);
+                                doc.text(`FECHA DE IMPRESIÓN: ${strFechaImpresion}`, 14, 264);
+                                doc.text("DAE_v1", 14, 267);
+                                doc.text("NOTA: ESTE DOCUMENTO CARECE DE VALIDEZ SIN FIRMA NI SELLO OFICIAL Y EN CASO DE TENER RASPADURAS O ENMENDADURAS", 14, 270);
+                            }
+                        });
                     });
+                    
+                    // Limpiamos nombre de archivo
+                    const safeCarrera = carrera.replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, '_');
+                    doc.save(`Listados_ETS_${periodoStr}_${safeCarrera}.pdf`);
                 });
 
-                doc.save("Listados_Inscritos_ETS.pdf");
-                alert("¡PDF generado y descargado con éxito (" + keys.length + " listados creados)!");
+                alert("¡Listados PDF generados y descargados con éxito!");
                 closeInscritosModal();
             } catch(err) {
                 console.error("Error al generar PDF:", err);
