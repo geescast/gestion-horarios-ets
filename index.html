@@ -1174,7 +1174,171 @@ function doLogin() {
         });
     </script>
 
-        let inscritosRows = [];
+        
+    <script>
+        
+
+        function openInscritosModal() {
+            document.getElementById('modal-inscritos').classList.remove('hidden');
+        }
+
+        function closeInscritosModal() {
+            document.getElementById('modal-inscritos').classList.add('hidden');
+        }
+
+        const excelInput = document.getElementById('excel-inscritos-input');
+        if (excelInput) {
+            excelInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    try {
+                        const data = new Uint8Array(evt.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        inscritosRows = XLSX.utils.sheet_to_json(firstSheet);
+                        
+                        const statusDiv = document.getElementById('inscritos-status');
+                        document.getElementById('inscritos-count').innerText = inscritosRows.length;
+                        statusDiv.classList.remove('hidden');
+                        document.getElementById('btn-generar-pdf').removeAttribute('disabled');
+                    } catch(err) {
+                        alert("Error al leer el archivo de inscritos: " + err.message);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function generarListadosPDF() {
+            if (inscritosRows.length === 0) {
+                alert("No hay registros cargados.");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('portrait', 'mm', 'letter');
+
+            const gruposMap = {};
+            inscritosRows.forEach(r => {
+                const prog = String(r['Programa académico'] || 'NO ESPECIFICADA');
+                const plan = String(r['Plan_Estud'] || '0');
+                const cveUda = String(r['Cve de UdA'] || '');
+                const uda = String(r['Unidad de aprendizaje'] || '');
+                const fecha = String(r['Fecha'] || '');
+                const hora = String(r['Hora'] || '');
+                const prof = String(r['Profesor'] || 'SIN ASIGNAR');
+                const turno = String(r['TURNO'] || 'MATUTINO');
+                const esp = String(r['ESPECIALIDAD'] || 'SIN ESPECIALIDAD');
+
+                const key = `${prog}|${plan}|${cveUda}|${uda}|${fecha}|${hora}|${prof}|${turno}|${esp}`;
+                if (!gruposMap[key]) {
+                    gruposMap[key] = [];
+                }
+                gruposMap[key].push(r);
+            });
+
+            const keys = Object.keys(gruposMap);
+            keys.forEach((key, index) => {
+                if (index > 0) {
+                    doc.addPage();
+                }
+
+                const listado = gruposMap[key];
+                const [prog, plan, cveUda, uda, fecha, hora, prof, turno, esp] = key.split('|');
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+                doc.setTextColor(107, 29, 47);
+                doc.text("INSTITUTO POLITÉCNICO NACIONAL", 108, 12, { align: "center" });
+                doc.text("ESCUELA SUPERIOR DE COMERCIO Y ADMINISTRACIÓN", 108, 16, { align: "center" });
+                doc.text("UNIDAD SANTO TOMÁS", 108, 20, { align: "center" });
+
+                doc.setFontSize(8);
+                doc.setTextColor(0, 0, 0);
+                doc.text("LISTA DE ASISTENCIA DEL ETS ORDINARIO CORRESPONDIENTE AL PERIODO JUL2026", 108, 25, { align: "center" });
+
+                doc.setFontSize(7.5);
+                let y = 32;
+                const col1X = 14;
+                const col2X = 110;
+
+                doc.text(`LICENCIATURA: ${prog}`, col1X, y);
+                doc.text(`FECHA DEL EXAMEN: ${fecha} ${hora}`, col2X, y);
+                y += 5;
+
+                doc.text(`PLAN DE ESTUDIOS: ${plan}`, col1X, y);
+                doc.text(`ASIGNATURA: ${cveUda}, ${uda}`, col2X, y);
+                y += 5;
+
+                doc.text(`ESPECIALIDAD: ${esp}`, col1X, y);
+                doc.text(`PROFESOR: ${prof}`, col2X, y);
+                y += 5;
+
+                doc.text(`ACADEMIA: NO ESPECIFICADA`, col1X, y);
+                doc.text(`TURNO: ${turno}`, col2X, y);
+                y += 5;
+
+                doc.text(`INSCRITOS AL ETS: ${listado.length}`, col1X, y);
+                doc.text(`NUMERO DE LISTADO: 1`, col2X, y);
+                y += 8;
+
+                const tableBody = listado.map((alu, i) => {
+                    const boleta = String(alu['BOLETA'] || '').replace('.0', '');
+                    const appPat = String(alu['APELLIDO PATERNO'] || '');
+                    const appMat = String(alu['APELLIDO MATERNO'] || '');
+                    const nombre = String(alu['NOMBRE(S)'] || '');
+                    const nombreCompleto = `${appPat} ${appMat} ${nombre}`.trim();
+
+                    return [
+                        String(i + 1),
+                        boleta,
+                        nombreCompleto,
+                        ""
+                    ];
+                });
+
+                doc.autoTable({
+                    startY: y,
+                    head: [['NO.', 'BOLETA', 'NOMBRE', 'ASISTENCIA']],
+                    body: tableBody,
+                    theme: 'grid',
+                    headStyles: {
+                        fillColor: [107, 29, 47],
+                        textColor: [255, 255, 255],
+                        fontStyle: 'bold',
+                        halign: 'center',
+                        fontSize: 8
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 15, halign: 'center' },
+                        1: { cellWidth: 35, halign: 'center' },
+                        2: { cellWidth: 110, halign: 'left' },
+                        3: { cellWidth: 30, halign: 'center' }
+                    },
+                    styles: {
+                        fontSize: 8,
+                        cellPadding: 2,
+                        textColor: [0, 0, 0]
+                    },
+                    didDrawPage: function (data) {
+                        doc.setFont("helvetica", "normal");
+                        doc.setFontSize(6.5);
+                        doc.text("FECHA DE IMPRESIÓN: jueves, 05 de mayo, 2026", 14, 274);
+                        doc.text("DAE_v1", 14, 277);
+                        doc.text("NOTA: ESTE DOCUMENTO CARECE DE VALIDEZ SIN FIRMA NI SELLO OFICIAL Y EN CASO DE TENER RASPADURAS O ENMENDADURAS", 14, 280);
+                    }
+                });
+            });
+
+            doc.save("Listados_Inscritos_ETS.pdf");
+            alert("¡PDF generado y descargado con éxito (" + keys.length + " listados creados)!");
+            closeInscritosModal();
+        }
+    </script>
+
+let inscritosRows = [];
 
         function openInscritosModal() {
             document.getElementById('modal-inscritos').classList.remove('hidden');
